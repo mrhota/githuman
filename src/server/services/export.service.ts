@@ -6,7 +6,8 @@ import { ReviewRepository } from '../repositories/review.repo.ts'
 import { ReviewFileRepository } from '../repositories/review-file.repo.ts'
 import { CommentRepository } from '../repositories/comment.repo.ts'
 import { getDiffSummary } from './diff.service.ts'
-import type { DiffFile, DiffLine, Comment, RepositoryInfo, ReviewSourceType, DiffSummary } from '../../shared/types.ts'
+import { parseSnapshotData, isV2Snapshot } from './snapshot.ts'
+import type { DiffFile, DiffLine, Comment, ReviewSourceType, DiffSummary } from '../../shared/types.ts'
 
 function getSourceLabel (sourceType: ReviewSourceType, sourceRef: string | null): string {
   if (sourceType === 'staged') {
@@ -28,24 +29,6 @@ function getSourceLabel (sourceType: ReviewSourceType, sourceRef: string | null)
 export interface ExportOptions {
   includeResolved?: boolean;
   includeDiffSnippets?: boolean;
-}
-
-/** Snapshot data format (version 1 - legacy) */
-interface LegacySnapshotData {
-  files: DiffFile[];
-  repository: RepositoryInfo;
-}
-
-/** Snapshot data format (version 2 - new) */
-interface NewSnapshotData {
-  repository: RepositoryInfo;
-  version: 2;
-}
-
-type SnapshotData = LegacySnapshotData | NewSnapshotData
-
-function isNewFormat (snapshot: SnapshotData): snapshot is NewSnapshotData {
-  return 'version' in snapshot && snapshot.version === 2
 }
 
 export class ExportService {
@@ -70,14 +53,14 @@ export class ExportService {
       return null
     }
 
-    const snapshot = JSON.parse(review.snapshotData) as SnapshotData
+    const snapshot = parseSnapshotData(review.snapshotData)
     const repository = snapshot.repository
 
     // Get files and summary based on format
     let files: DiffFile[]
     let summary: DiffSummary
 
-    if (isNewFormat(snapshot)) {
+    if (isV2Snapshot(snapshot)) {
       // New format: get files from review_files table
       // We need to get full file records with hunks for export
       const reviewFilesMeta = this.fileRepo.findByReview(reviewId)
