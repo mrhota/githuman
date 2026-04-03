@@ -22,6 +22,7 @@ Options:
   --cert <path>          Path to TLS certificate file (PEM format)
   --key <path>           Path to TLS private key file (PEM format)
   --auth [token]         Enable auth (auto-generates token if no value given)
+  --no-docs              Disable OpenAPI documentation UI at /docs
   -v, --verbose          Enable verbose logging (full pino-pretty output)
   -h, --help             Show this help message
 
@@ -91,6 +92,7 @@ export async function serveCommand (args: string[]) {
       https: { type: 'boolean', default: true },
       cert: { type: 'string' },
       key: { type: 'string' },
+      docs: { type: 'boolean', default: true },
       verbose: { type: 'boolean', short: 'v', default: false },
       help: { type: 'boolean', short: 'h' },
     },
@@ -159,6 +161,7 @@ export async function serveCommand (args: string[]) {
     https: enableHttps,
     tlsCert,
     tlsKey,
+    enableDocs: values.docs,
   })
 
   // Start the server
