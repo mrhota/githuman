@@ -2,10 +2,7 @@
  * Review API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { getDatabase } from '../db/index.ts'
-import { ReviewService, ReviewError } from '../services/review.service.ts'
-import type { GitServiceLogger } from '../services/git.service.ts'
-import { ExportService } from '../services/export.service.ts'
+import { ReviewError } from '../services/review.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 import { DiffHunkSchema, DiffFileMetadataSchema, DiffSummarySchema } from '../schemas/diff.ts'
 import { ReviewStatusSchema, ReviewSourceTypeSchema } from '../schemas/review.ts'
@@ -113,11 +110,6 @@ const ExportQuerystringSchema = Type.Object({
 })
 
 const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  const getService = (log?: GitServiceLogger) => {
-    const db = getDatabase()
-    return new ReviewService(db, fastify.config.repositoryPath, log)
-  }
-
   /**
    * GET /api/reviews
    * List all reviews with pagination and filtering
@@ -134,7 +126,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
   }, async (request) => {
     const { page, pageSize, status } = request.query
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
 
     return service.list({
       page: page ? parseInt(page, 10) : undefined,
@@ -160,7 +152,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
 
     try {
       const review = await service.create(request.body)
@@ -193,7 +185,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
     const review = service.getById(request.params.id)
 
     if (!review) {
@@ -223,7 +215,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
     const filePath = request.query.path
 
     if (!filePath) {
@@ -262,7 +254,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
     const review = service.update(request.params.id, request.body)
 
     if (!review) {
@@ -290,7 +282,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
     const deleted = service.delete(request.params.id)
 
     if (!deleted) {
@@ -316,7 +308,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request) => {
-    const service = getService(request.log)
+    const service = fastify.services.review(request.log)
     return service.getStats(fastify.config.repositoryPath)
   })
 
@@ -337,8 +329,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const db = getDatabase()
-    const exportService = new ExportService(db)
+    const exportService = fastify.services.export()
 
     const { includeResolved, includeDiffSnippets } = request.query
 

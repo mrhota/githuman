@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import authPlugin from './plugins/auth.ts'
+import servicesPlugin from './plugins/services.ts'
 import diffRoutes, { imageRoute } from './routes/diff.ts'
 import reviewRoutes from './routes/reviews.ts'
 import commentRoutes from './routes/comments.ts'
@@ -180,6 +181,9 @@ export async function buildApp (
 
   // Store config on app instance for routes to access
   app.decorate('config', config)
+
+  // Register service factories
+  await app.register(servicesPlugin)
 
   // Register routes
   await app.register(diffRoutes)
