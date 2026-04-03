@@ -2,9 +2,7 @@
  * Review API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { getDatabase } from '../db/index.ts'
-import { ReviewService, ReviewError } from '../services/review.service.ts'
-import { ExportService } from '../services/export.service.ts'
+import { ReviewError } from '../services/review.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 
 const ReviewStatusSchema = Type.Union(
@@ -164,11 +162,6 @@ const ExportQuerystringSchema = Type.Object({
 })
 
 const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  const getService = () => {
-    const db = getDatabase()
-    return new ReviewService(db, fastify.config.repositoryPath)
-  }
-
   /**
    * GET /api/reviews
    * List all reviews with pagination and filtering
@@ -185,7 +178,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
   }, async (request) => {
     const { page, pageSize, status } = request.query
-    const service = getService()
+    const service = fastify.services.review()
 
     return service.list({
       page: page ? parseInt(page, 10) : undefined,
@@ -211,7 +204,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review()
 
     try {
       const review = await service.create(request.body)
@@ -244,7 +237,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review()
     const review = service.getById(request.params.id)
 
     if (!review) {
@@ -274,7 +267,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review()
     const filePath = request.query.path
 
     if (!filePath) {
@@ -313,7 +306,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review()
     const review = service.update(request.params.id, request.body)
 
     if (!review) {
@@ -341,7 +334,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review()
     const deleted = service.delete(request.params.id)
 
     if (!deleted) {
@@ -367,7 +360,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const service = getService()
+    const service = fastify.services.review()
     return service.getStats(fastify.config.repositoryPath)
   })
 
@@ -388,8 +381,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const db = getDatabase()
-    const exportService = new ExportService(db)
+    const exportService = fastify.services.export()
 
     const { includeResolved, includeDiffSnippets } = request.query
 

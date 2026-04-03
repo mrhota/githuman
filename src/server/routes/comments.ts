@@ -2,11 +2,7 @@
  * Comment API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { getDatabase } from '../db/index.ts'
-import {
-  CommentService,
-  CommentError,
-} from '../services/comment.service.ts'
+import { CommentError } from '../services/comment.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 
 const CommentSchema = Type.Object(
@@ -80,11 +76,6 @@ const CommentStatsSchema = Type.Object(
 )
 
 const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  const getService = () => {
-    const db = getDatabase()
-    return new CommentService(db)
-  }
-
   /**
    * GET /api/reviews/:reviewId/comments
    * List all comments for a review, optionally filtered by file
@@ -101,7 +92,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const { reviewId } = request.params
     const { filePath } = request.query
 
@@ -127,7 +118,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request) => {
-    const service = getService()
+    const service = fastify.services.comment()
     return service.getStats(request.params.reviewId)
   })
 
@@ -149,7 +140,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
 
     try {
       const comment = service.create(request.params.reviewId, request.body)
@@ -183,7 +174,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const comment = service.getById(request.params.id)
 
     if (!comment) {
@@ -212,7 +203,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const comment = service.update(request.params.id, request.body)
 
     if (!comment) {
@@ -240,7 +231,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const deleted = service.delete(request.params.id)
 
     if (!deleted) {
@@ -268,7 +259,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const comment = service.resolve(request.params.id)
 
     if (!comment) {
@@ -296,7 +287,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.comment()
     const comment = service.unresolve(request.params.id)
 
     if (!comment) {

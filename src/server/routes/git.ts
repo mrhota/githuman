@@ -2,7 +2,6 @@
  * Git API routes - repository info, branches, commits
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { GitService } from '../services/git.service.ts'
 import { ErrorSchema } from '../schemas/common.ts'
 
 const RepositoryInfoSchema = Type.Object(
@@ -135,11 +134,6 @@ const FileContentAtRefResponseSchema = Type.Object(
 )
 
 const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  // Helper to get git service
-  const getService = () => {
-    return new GitService(fastify.config.repositoryPath)
-  }
-
   /**
    * GET /api/git/info
    * Get repository information
@@ -155,7 +149,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
 
     try {
       const info = await service.getRepositoryInfo()
@@ -181,7 +175,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const service = getService()
+    const service = fastify.services.git()
     return service.getBranches()
   })
 
@@ -200,7 +194,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request) => {
-    const service = getService()
+    const service = fastify.services.git()
     const limit = request.query.limit ? parseInt(request.query.limit, 10) : 20
     const offset = request.query.offset ? parseInt(request.query.offset, 10) : 0
     const search = request.query.search || undefined
@@ -222,7 +216,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const service = getService()
+    const service = fastify.services.git()
     const hasStagedChanges = await service.hasStagedChanges()
     return { hasStagedChanges }
   })
@@ -241,7 +235,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const service = getService()
+    const service = fastify.services.git()
     const hasUnstagedChanges = await service.hasUnstagedChanges()
     const files = hasUnstagedChanges ? await service.getUnstagedFiles() : []
     return { hasUnstagedChanges, files }
@@ -263,7 +257,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
     const { files } = request.body
 
     if (!files || files.length === 0) {
@@ -295,7 +289,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
 
     try {
       // Get list of unstaged files before staging
@@ -326,7 +320,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
     const { files } = request.body
 
     if (!files || files.length === 0) {
@@ -365,7 +359,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
     const { ref } = request.params
     const { includeWorkingDir } = request.query
 
@@ -408,7 +402,7 @@ const gitRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.git()
     const filePath = (request.params as Record<string, string>)['*']
     const { ref } = request.query
 
