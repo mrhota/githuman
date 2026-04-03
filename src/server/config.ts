@@ -15,6 +15,7 @@ export interface ServerConfig {
   https: boolean;
   tlsCert?: string; // PEM content
   tlsKey?: string; // PEM content
+  enableDocs: boolean;
 }
 
 /**
@@ -77,5 +78,6 @@ export function createConfig (options: Partial<ServerConfig> = {}): ServerConfig
     https: options.https ?? false,
     tlsCert: options.tlsCert,
     tlsKey: options.tlsKey,
+    enableDocs: options.enableDocs ?? true,
   }
 }

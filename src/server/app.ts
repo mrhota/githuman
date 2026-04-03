@@ -102,51 +102,53 @@ export async function buildApp (
     xXssProtection: true,
   })
 
-  // Register Swagger for OpenAPI documentation
-  await app.register(fastifySwagger, {
-    openapi: {
-      openapi: '3.1.0',
-      info: {
-        title: 'GitHuman API',
-        description: 'API for reviewing AI agent code changes before commit',
-        version: '0.1.0',
-      },
-      tags: [
-        { name: 'health', description: 'Health check endpoints' },
-        { name: 'todos', description: 'Todo management' },
-        { name: 'reviews', description: 'Code review management' },
-        { name: 'comments', description: 'Review comments' },
-        { name: 'diff', description: 'Git diff operations' },
-        { name: 'git', description: 'Git repository information' },
-        { name: 'events', description: 'Server-sent events for real-time updates' },
-      ],
-      servers: [
-        {
-          url: `${config.https ? 'https' : 'http'}://${config.host}:${config.port}`,
-          description: 'Local development server',
+  // Register Swagger for OpenAPI documentation (conditionally)
+  if (config.enableDocs) {
+    await app.register(fastifySwagger, {
+      openapi: {
+        openapi: '3.1.0',
+        info: {
+          title: 'GitHuman API',
+          description: 'API for reviewing AI agent code changes before commit',
+          version: '0.1.0',
         },
-      ],
-      components: {
-        securitySchemes: {
-          bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            description: 'Optional Bearer token authentication. Set via GITHUMAN_TOKEN env var or --token flag.',
+        tags: [
+          { name: 'health', description: 'Health check endpoints' },
+          { name: 'todos', description: 'Todo management' },
+          { name: 'reviews', description: 'Code review management' },
+          { name: 'comments', description: 'Review comments' },
+          { name: 'diff', description: 'Git diff operations' },
+          { name: 'git', description: 'Git repository information' },
+          { name: 'events', description: 'Server-sent events for real-time updates' },
+        ],
+        servers: [
+          {
+            url: `${config.https ? 'https' : 'http'}://${config.host}:${config.port}`,
+            description: 'Local development server',
+          },
+        ],
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: 'http',
+              scheme: 'bearer',
+              description: 'Optional Bearer token authentication. Set via GITHUMAN_TOKEN env var or --token flag.',
+            },
           },
         },
+        security: config.authToken ? [{ bearerAuth: [] }] : []
       },
-      security: config.authToken ? [{ bearerAuth: [] }] : []
-    },
-  })
+    })
 
-  // Register Swagger UI
-  await app.register(fastifySwaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: {
-      docExpansion: 'list',
-      deepLinking: true,
-    },
-  })
+    // Register Swagger UI
+    await app.register(fastifySwaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: true,
+      },
+    })
+  }
 
   // Register CORS for development
   await app.register(cors, {
