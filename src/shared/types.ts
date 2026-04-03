@@ -25,6 +25,7 @@ export interface Comment {
   lineType: 'added' | 'removed' | 'context' | null;
   content: string;
   suggestion: string | null;
+  /** Whether the reviewer's concern has been addressed (the discussion is settled). */
   resolved: boolean;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +34,7 @@ export interface Comment {
 export interface Todo {
   id: string;
   content: string;
+  /** Whether the work has been performed (the task is done). */
   completed: boolean;
   reviewId: string | null; // null for global todos
   position: number;
