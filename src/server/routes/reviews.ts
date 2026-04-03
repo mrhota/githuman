@@ -2,64 +2,10 @@
  * Review API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { getDatabase } from '../db/index.ts'
-import { ReviewService, ReviewError } from '../services/review.service.ts'
-import { ExportService } from '../services/export.service.ts'
+import { ReviewError } from '../services/review.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
-
-const ReviewStatusSchema = Type.Union(
-  [Type.Literal('in_progress'), Type.Literal('approved'), Type.Literal('changes_requested')],
-  { description: 'Review status' }
-)
-
-const ReviewSourceTypeSchema = Type.Union(
-  [Type.Literal('staged'), Type.Literal('branch'), Type.Literal('commits')],
-  { description: 'Review source type' }
-)
-
-const DiffLineSchema = Type.Object({
-  type: Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')]),
-  content: Type.String(),
-  oldLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-  newLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-})
-
-const DiffHunkSchema = Type.Object({
-  oldStart: Type.Integer(),
-  oldLines: Type.Integer(),
-  newStart: Type.Integer(),
-  newLines: Type.Integer(),
-  lines: Type.Array(DiffLineSchema),
-})
-
-const DiffFileMetadataSchema = Type.Object(
-  {
-    oldPath: Type.String({ description: 'Original file path' }),
-    newPath: Type.String({ description: 'New file path' }),
-    status: Type.Union([
-      Type.Literal('added'),
-      Type.Literal('modified'),
-      Type.Literal('deleted'),
-      Type.Literal('renamed'),
-    ]),
-    additions: Type.Integer({ description: 'Number of lines added' }),
-    deletions: Type.Integer({ description: 'Number of lines deleted' }),
-  },
-  { description: 'Diff file metadata (without hunks for lazy loading)' }
-)
-
-const DiffSummarySchema = Type.Object(
-  {
-    totalFiles: Type.Integer({ description: 'Total number of files' }),
-    totalAdditions: Type.Integer({ description: 'Total lines added' }),
-    totalDeletions: Type.Integer({ description: 'Total lines deleted' }),
-    filesAdded: Type.Integer({ description: 'Number of files added' }),
-    filesModified: Type.Integer({ description: 'Number of files modified' }),
-    filesDeleted: Type.Integer({ description: 'Number of files deleted' }),
-    filesRenamed: Type.Integer({ description: 'Number of files renamed' }),
-  },
-  { description: 'Diff summary statistics' }
-)
+import { DiffHunkSchema, DiffFileMetadataSchema, DiffSummarySchema } from '../schemas/diff.ts'
+import { ReviewStatusSchema, ReviewSourceTypeSchema } from '../schemas/review.ts'
 
 const ReviewListItemSchema = Type.Object(
   {
@@ -164,11 +110,6 @@ const ExportQuerystringSchema = Type.Object({
 })
 
 const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  const getService = () => {
-    const db = getDatabase()
-    return new ReviewService(db, fastify.config.repositoryPath)
-  }
-
   /**
    * GET /api/reviews
    * List all reviews with pagination and filtering
@@ -185,7 +126,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
   }, async (request) => {
     const { page, pageSize, status } = request.query
-    const service = getService()
+    const service = fastify.services.review(request.log)
 
     return service.list({
       page: page ? parseInt(page, 10) : undefined,
@@ -211,7 +152,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review(request.log)
 
     try {
       const review = await service.create(request.body)
@@ -244,7 +185,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review(request.log)
     const review = service.getById(request.params.id)
 
     if (!review) {
@@ -274,7 +215,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review(request.log)
     const filePath = request.query.path
 
     if (!filePath) {
@@ -314,7 +255,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review(request.log)
 
     try {
       const review = service.update(request.params.id, request.body)
@@ -353,7 +294,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const service = getService()
+    const service = fastify.services.review(request.log)
     const deleted = service.delete(request.params.id)
 
     if (!deleted) {
@@ -378,8 +319,8 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
         200: ReviewStatsSchema,
       },
     },
-  }, async () => {
-    const service = getService()
+  }, async (request) => {
+    const service = fastify.services.review(request.log)
     return service.getStats(fastify.config.repositoryPath)
   })
 
@@ -400,8 +341,7 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const db = getDatabase()
-    const exportService = new ExportService(db)
+    const exportService = fastify.services.export()
 
     const { includeResolved, includeDiffSnippets } = request.query
 

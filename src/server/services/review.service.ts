@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { ReviewRepository } from '../repositories/review.repo.ts'
 import { ReviewFileRepository, type CreateReviewFileInput } from '../repositories/review-file.repo.ts'
-import { GitService } from './git.service.ts'
+import { GitService, type GitServiceLogger } from './git.service.ts'
 import { parseDiff, parseSingleFileDiff, getDiffSummary, type DiffSummary } from './diff.service.ts'
 import type {
   Review,
@@ -18,6 +18,7 @@ import type {
   UpdateReviewRequest,
   PaginatedResponse,
 } from '../../shared/types.ts'
+import { parseSnapshotData, isV2Snapshot } from './snapshot.ts'
 
 /** File metadata without hunks (for lazy loading) */
 export interface DiffFileMetadata {
@@ -50,11 +51,11 @@ export class ReviewService {
   private git: GitService
   private db: DatabaseSync
 
-  constructor (db: DatabaseSync, repositoryPath: string) {
+  constructor (db: DatabaseSync, repositoryPath: string, log?: GitServiceLogger) {
     this.db = db
     this.repo = new ReviewRepository(db)
     this.fileRepo = new ReviewFileRepository(db)
-    this.git = new GitService(repositoryPath)
+    this.git = new GitService(repositoryPath, log)
   }
 
   /**
@@ -223,8 +224,8 @@ export class ReviewService {
     }
 
     // For staged reviews without stored hunks (legacy), try to get from snapshot
-    const snapshot = this.parseSnapshotData(review.snapshotData)
-    if (snapshot.files) {
+    const snapshot = parseSnapshotData(review.snapshotData)
+    if (!isV2Snapshot(snapshot)) {
       const legacyFile = snapshot.files.find((f: DiffFile) => f.newPath === filePath)
       if (legacyFile) {
         return legacyFile.hunks
@@ -321,31 +322,13 @@ export class ReviewService {
     }
   }
 
-  /**
-   * Parse snapshot data and handle both old and new formats
-   */
-  private parseSnapshotData (snapshotData: string): {
-    files?: DiffFile[];
-    repository: RepositoryInfo;
-    version?: number;
-  } {
-    return JSON.parse(snapshotData)
-  }
-
-  /**
-   * Check if snapshot uses new format (version 2)
-   */
-  private isNewFormat (snapshot: { version?: number }): boolean {
-    return snapshot.version === 2
-  }
-
   private toReviewWithDetails (review: Review): ReviewWithDetails {
-    const snapshot = this.parseSnapshotData(review.snapshotData)
+    const snapshot = parseSnapshotData(review.snapshotData)
 
     let fileMetadata: DiffFileMetadata[]
     let summary: DiffSummary
 
-    if (this.isNewFormat(snapshot)) {
+    if (isV2Snapshot(snapshot)) {
       // New format: get files from review_files table
       const reviewFiles = this.fileRepo.findByReview(review.id)
       fileMetadata = reviewFiles.map((rf) => ({
@@ -375,7 +358,7 @@ export class ReviewService {
       }
     } else {
       // Legacy format: files embedded in snapshot_data
-      const files = snapshot.files ?? []
+      const files = snapshot.files
       fileMetadata = files.map((file) => ({
         oldPath: file.oldPath,
         newPath: file.newPath,
@@ -402,11 +385,11 @@ export class ReviewService {
   }
 
   private toReviewListItem (review: Review): ReviewListItem {
-    const snapshot = this.parseSnapshotData(review.snapshotData)
+    const snapshot = parseSnapshotData(review.snapshotData)
 
     let summary: DiffSummary
 
-    if (this.isNewFormat(snapshot)) {
+    if (isV2Snapshot(snapshot)) {
       // New format: get files from review_files table
       const reviewFiles = this.fileRepo.findByReview(review.id)
 
@@ -428,8 +411,7 @@ export class ReviewService {
       }
     } else {
       // Legacy format
-      const files = snapshot.files ?? []
-      summary = getDiffSummary(files)
+      summary = getDiffSummary(snapshot.files)
     }
 
     return {

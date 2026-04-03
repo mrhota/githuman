@@ -2,64 +2,9 @@
  * Diff API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { GitService } from '../services/git.service.ts'
 import { parseDiff, getDiffSummary } from '../services/diff.service.ts'
 import { ErrorSchema } from '../schemas/common.ts'
-
-const DiffLineSchema = Type.Object({
-  type: Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')]),
-  content: Type.String(),
-  oldLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-  newLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-})
-
-const DiffHunkSchema = Type.Object({
-  oldStart: Type.Integer(),
-  oldLines: Type.Integer(),
-  newStart: Type.Integer(),
-  newLines: Type.Integer(),
-  lines: Type.Array(DiffLineSchema),
-})
-
-const DiffFileSchema = Type.Object(
-  {
-    oldPath: Type.String({ description: 'Original file path' }),
-    newPath: Type.String({ description: 'New file path' }),
-    status: Type.Union([
-      Type.Literal('added'),
-      Type.Literal('modified'),
-      Type.Literal('deleted'),
-      Type.Literal('renamed'),
-    ]),
-    additions: Type.Integer({ description: 'Number of lines added' }),
-    deletions: Type.Integer({ description: 'Number of lines deleted' }),
-    hunks: Type.Array(DiffHunkSchema),
-  },
-  { description: 'Diff file' }
-)
-
-const DiffSummarySchema = Type.Object(
-  {
-    totalFiles: Type.Integer({ description: 'Total number of files' }),
-    totalAdditions: Type.Integer({ description: 'Total lines added' }),
-    totalDeletions: Type.Integer({ description: 'Total lines deleted' }),
-    filesAdded: Type.Integer({ description: 'Number of files added' }),
-    filesModified: Type.Integer({ description: 'Number of files modified' }),
-    filesDeleted: Type.Integer({ description: 'Number of files deleted' }),
-    filesRenamed: Type.Integer({ description: 'Number of files renamed' }),
-  },
-  { description: 'Diff summary statistics' }
-)
-
-const RepositoryInfoSchema = Type.Object(
-  {
-    name: Type.String({ description: 'Repository name' }),
-    branch: Type.String({ description: 'Current branch' }),
-    remote: Type.Union([Type.String(), Type.Null()], { description: 'Remote URL' }),
-    path: Type.String({ description: 'Repository path' }),
-  },
-  { description: 'Repository information' }
-)
+import { DiffFileSchema, DiffSummarySchema, RepositoryInfoSchema } from '../schemas/diff.ts'
 
 const StagedDiffResponseSchema = Type.Object(
   {
@@ -147,7 +92,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     // Check if it's a git repository
     if (!(await gitService.isRepo())) {
@@ -211,7 +156,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     // Check if it's a git repository
     if (!(await gitService.isRepo())) {
@@ -275,7 +220,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     // Check if it's a git repository
     if (!(await gitService.isRepo())) {
@@ -330,7 +275,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     // Check if it's a git repository
     if (!(await gitService.isRepo())) {
@@ -376,7 +321,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       return reply.code(400).send({ error: 'File path is required' })
     }
 
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     if (!(await gitService.isRepo())) {
       return reply.code(400).send({ error: 'Not a git repository' })
@@ -451,7 +396,7 @@ const imageRoute: FastifyPluginAsyncTypebox = async (fastify) => {
       return reply.code(400).send({ error: 'File path is required' })
     }
 
-    const gitService = new GitService(fastify.config.repositoryPath)
+    const gitService = fastify.services.git(request.log)
 
     if (!(await gitService.isRepo())) {
       return reply.code(400).send({ error: 'Not a git repository' })

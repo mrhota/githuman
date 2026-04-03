@@ -3,8 +3,6 @@
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { randomUUID } from 'node:crypto'
-import { getDatabase } from '../db/index.ts'
-import { TodoRepository } from '../repositories/todo.repo.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 
 const TodoSchema = Type.Object(
@@ -108,11 +106,6 @@ export interface TodoStats {
 }
 
 const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  const getRepo = () => {
-    const db = getDatabase()
-    return new TodoRepository(db)
-  }
-
   /**
    * GET /api/todos
    * List all todos with optional filtering and pagination
@@ -128,7 +121,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const { reviewId, completed, limit, offset = 0 } = request.query
 
     let data: ReturnType<typeof repo.findAll>
@@ -172,7 +165,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     return {
       total: repo.countAll(),
       completed: repo.countCompleted(),
@@ -195,7 +188,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const { content, reviewId } = request.body
 
     const todo = repo.create({
@@ -225,7 +218,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const todo = repo.findById(request.params.id)
 
     if (!todo) {
@@ -254,7 +247,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const todo = repo.update(request.params.id, request.body)
 
     if (!todo) {
@@ -282,7 +275,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const deleted = repo.delete(request.params.id)
 
     if (!deleted) {
@@ -310,7 +303,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const todo = repo.toggle(request.params.id)
 
     if (!todo) {
@@ -336,7 +329,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async () => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const count = repo.deleteCompleted()
     return { deleted: count }
   })
@@ -356,7 +349,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const { orderedIds } = request.body
     const updated = repo.reorder(orderedIds)
     return { updated }
@@ -379,7 +372,7 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
   }, async (request, reply) => {
-    const repo = getRepo()
+    const repo = fastify.services.todoRepo()
     const { position } = request.body
     const todo = repo.move(request.params.id, position)
 
