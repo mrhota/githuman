@@ -692,4 +692,43 @@ describe('git.service', () => {
       assert.ok(files.includes('src/utils/helper.ts'), 'Should include file with full path')
     })
   })
+
+  describe('logger injection', () => {
+    it('should accept an optional logger in the constructor', (t: TestContext) => {
+      const tempDir = createTestRepo(t)
+      const messages: string[] = []
+      const logger = {
+        debug: (_obj: unknown, msg: string) => messages.push(msg),
+        warn: (_obj: unknown, msg: string) => messages.push(msg),
+      }
+
+      // Should construct without error
+      const git = new GitService(tempDir, logger)
+      assert.ok(git)
+    })
+
+    it('should use the injected logger for debug messages', async (t: TestContext) => {
+      const tempDir = createTestRepo(t)
+      const messages: Array<{ level: string; msg: string }> = []
+      const logger = {
+        debug: (_obj: unknown, msg: string) => messages.push({ level: 'debug', msg }),
+        warn: (_obj: unknown, msg: string) => messages.push({ level: 'warn', msg }),
+      }
+
+      const git = new GitService(tempDir, logger)
+      // isRepo on a valid repo shouldn't log, but getCurrentBranch on empty repo will
+      await git.getCurrentBranch()
+
+      // Should have logged debug messages via the injected logger
+      assert.ok(messages.length > 0, 'Should have logged via injected logger')
+      assert.ok(messages.some(m => m.level === 'debug'), 'Should have debug-level messages')
+    })
+
+    it('should work without a logger (backwards compatible)', (t: TestContext) => {
+      const tempDir = createTestRepo(t)
+      // No logger argument — should not throw
+      const git = new GitService(tempDir)
+      assert.ok(git)
+    })
+  })
 })

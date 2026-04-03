@@ -5,21 +5,22 @@ import { simpleGit, type SimpleGit } from 'simple-git'
 import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { requestContext } from '../app.ts'
 import type { RepositoryInfo } from '../../shared/types.ts'
+
+export interface GitServiceLogger {
+  debug: (obj: unknown, msg: string) => void
+  warn: (obj: unknown, msg: string) => void
+}
 
 export class GitService {
   private git: SimpleGit
   private repoPath: string
+  private log?: GitServiceLogger
 
-  constructor (repoPath: string) {
+  constructor (repoPath: string, log?: GitServiceLogger) {
     this.repoPath = repoPath
     this.git = simpleGit(repoPath)
-  }
-
-  /** Get the logger from request context */
-  private get log () {
-    return requestContext.get('log')
+    this.log = log
   }
 
   /**
