@@ -250,20 +250,32 @@ const reviewRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       body: UpdateReviewSchema,
       response: {
         200: ReviewWithDetailsSchema,
+        400: ErrorSchema,
         404: ErrorSchema,
       },
     },
   }, async (request, reply) => {
     const service = fastify.services.review(request.log)
-    const review = service.update(request.params.id, request.body)
 
-    if (!review) {
-      return reply.code(404).send({
-        error: 'Review not found',
-      })
+    try {
+      const review = service.update(request.params.id, request.body)
+
+      if (!review) {
+        return reply.code(404).send({
+          error: 'Review not found',
+        })
+      }
+
+      return review
+    } catch (err) {
+      if (err instanceof ReviewError && err.code === 'INVALID_TRANSITION') {
+        return reply.code(400).send({
+          error: err.message,
+          code: err.code,
+        })
+      }
+      throw err
     }
-
-    return review
   })
 
   /**

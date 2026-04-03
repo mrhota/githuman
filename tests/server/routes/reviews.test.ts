@@ -326,19 +326,6 @@ describe('review routes with staged changes', () => {
       assert.ok(body.summary)
     })
 
-    it('should update review status to approved', async () => {
-      const response = await app.inject({
-        method: 'PATCH',
-        url: `/api/reviews/${reviewId}`,
-        headers: authHeader(),
-        payload: { status: 'approved' },
-      })
-
-      assert.strictEqual(response.statusCode, 200)
-      const body = JSON.parse(response.body)
-      assert.strictEqual(body.status, 'approved')
-    })
-
     it('should update review status to changes_requested', async () => {
       const response = await app.inject({
         method: 'PATCH',
@@ -363,6 +350,19 @@ describe('review routes with staged changes', () => {
       const markdown = response.body
       assert.ok(markdown.includes('# Code Review:'))
       assert.ok(markdown.includes('Changes Requested'))
+    })
+
+    it('should update review status to approved', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/reviews/${reviewId}`,
+        headers: authHeader(),
+        payload: { status: 'approved' },
+      })
+
+      assert.strictEqual(response.statusCode, 200)
+      const body = JSON.parse(response.body)
+      assert.strictEqual(body.status, 'approved')
     })
 
     it('should delete review', async () => {
