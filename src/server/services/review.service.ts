@@ -38,6 +38,12 @@ export interface ReviewListItem extends Omit<Review, 'snapshotData'> {
   summary: DiffSummary;
 }
 
+const VALID_TRANSITIONS: Record<ReviewStatus, ReadonlySet<ReviewStatus>> = {
+  in_progress: new Set(['approved', 'changes_requested']),
+  changes_requested: new Set(['in_progress', 'approved']),
+  approved: new Set(), // terminal state
+}
+
 export class ReviewService {
   private repo: ReviewRepository
   private fileRepo: ReviewFileRepository
@@ -255,6 +261,23 @@ export class ReviewService {
    * Update a review
    */
   update (id: string, request: UpdateReviewRequest): ReviewWithDetails | null {
+    if (request.status) {
+      const existing = this.repo.findById(id)
+      if (!existing) {
+        return null
+      }
+
+      if (request.status !== existing.status) {
+        const allowed = VALID_TRANSITIONS[existing.status]
+        if (!allowed.has(request.status)) {
+          throw new ReviewError(
+            `Invalid status transition from '${existing.status}' to '${request.status}'`,
+            'INVALID_TRANSITION'
+          )
+        }
+      }
+    }
+
     const review = this.repo.update(id, {
       status: request.status,
     })
