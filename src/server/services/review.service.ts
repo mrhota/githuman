@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { ReviewRepository } from '../repositories/review.repo.ts'
 import { ReviewFileRepository, type CreateReviewFileInput } from '../repositories/review-file.repo.ts'
-import { GitService } from './git.service.ts'
+import { GitService, type GitServiceLogger } from './git.service.ts'
 import { parseDiff, parseSingleFileDiff, getDiffSummary, type DiffSummary } from './diff.service.ts'
 import type {
   Review,
@@ -44,11 +44,11 @@ export class ReviewService {
   private git: GitService
   private db: DatabaseSync
 
-  constructor (db: DatabaseSync, repositoryPath: string) {
+  constructor (db: DatabaseSync, repositoryPath: string, log?: GitServiceLogger) {
     this.db = db
     this.repo = new ReviewRepository(db)
     this.fileRepo = new ReviewFileRepository(db)
-    this.git = new GitService(repositoryPath)
+    this.git = new GitService(repositoryPath, log)
   }
 
   /**

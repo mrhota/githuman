@@ -3,7 +3,6 @@
  */
 import Fastify, { type FastifyInstance, type FastifyPluginAsync } from 'fastify'
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
-import { fastifyRequestContext, requestContext } from '@fastify/request-context'
 import fastifySwagger from '@fastify/swagger'
 import fastifySwaggerUi from '@fastify/swagger-ui'
 import helmet from '@fastify/helmet'
@@ -65,15 +64,6 @@ export async function buildApp (
     forceCloseConnections: true, // Close all connections on shutdown (important for SSE)
     ...httpsOptions,
   }).withTypeProvider<TypeBoxTypeProvider>()
-
-  // Register request context plugin
-  await app.register(fastifyRequestContext)
-
-  // Store request logger in context for access from services
-  app.addHook('onRequest', (request, _reply, done) => {
-    request.requestContext.set('log', request.log)
-    done()
-  })
 
   // Register security headers with helmet
   await app.register(helmet, {
@@ -223,19 +213,9 @@ export async function buildApp (
   return app
 }
 
-// Re-export requestContext for use in services
-export { requestContext }
-
 // Extend Fastify types
 declare module 'fastify' {
   interface FastifyInstance {
     config: ServerConfig;
-  }
-}
-
-// Extend request context types
-declare module '@fastify/request-context' {
-  interface RequestContextData {
-    log: import('fastify').FastifyBaseLogger;
   }
 }
