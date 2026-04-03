@@ -7,60 +7,8 @@ import { ReviewService, ReviewError } from '../services/review.service.ts'
 import type { GitServiceLogger } from '../services/git.service.ts'
 import { ExportService } from '../services/export.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
-
-const ReviewStatusSchema = Type.Union(
-  [Type.Literal('in_progress'), Type.Literal('approved'), Type.Literal('changes_requested')],
-  { description: 'Review status' }
-)
-
-const ReviewSourceTypeSchema = Type.Union(
-  [Type.Literal('staged'), Type.Literal('branch'), Type.Literal('commits')],
-  { description: 'Review source type' }
-)
-
-const DiffLineSchema = Type.Object({
-  type: Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')]),
-  content: Type.String(),
-  oldLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-  newLineNumber: Type.Union([Type.Integer(), Type.Null()]),
-})
-
-const DiffHunkSchema = Type.Object({
-  oldStart: Type.Integer(),
-  oldLines: Type.Integer(),
-  newStart: Type.Integer(),
-  newLines: Type.Integer(),
-  lines: Type.Array(DiffLineSchema),
-})
-
-const DiffFileMetadataSchema = Type.Object(
-  {
-    oldPath: Type.String({ description: 'Original file path' }),
-    newPath: Type.String({ description: 'New file path' }),
-    status: Type.Union([
-      Type.Literal('added'),
-      Type.Literal('modified'),
-      Type.Literal('deleted'),
-      Type.Literal('renamed'),
-    ]),
-    additions: Type.Integer({ description: 'Number of lines added' }),
-    deletions: Type.Integer({ description: 'Number of lines deleted' }),
-  },
-  { description: 'Diff file metadata (without hunks for lazy loading)' }
-)
-
-const DiffSummarySchema = Type.Object(
-  {
-    totalFiles: Type.Integer({ description: 'Total number of files' }),
-    totalAdditions: Type.Integer({ description: 'Total lines added' }),
-    totalDeletions: Type.Integer({ description: 'Total lines deleted' }),
-    filesAdded: Type.Integer({ description: 'Number of files added' }),
-    filesModified: Type.Integer({ description: 'Number of files modified' }),
-    filesDeleted: Type.Integer({ description: 'Number of files deleted' }),
-    filesRenamed: Type.Integer({ description: 'Number of files renamed' }),
-  },
-  { description: 'Diff summary statistics' }
-)
+import { DiffHunkSchema, DiffFileMetadataSchema, DiffSummarySchema } from '../schemas/diff.ts'
+import { ReviewStatusSchema, ReviewSourceTypeSchema } from '../schemas/review.ts'
 
 const ReviewListItemSchema = Type.Object(
   {
