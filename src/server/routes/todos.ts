@@ -2,7 +2,6 @@
  * Todo API routes
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { randomUUID } from 'node:crypto'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 
 const TodoSchema = Type.Object(
@@ -192,7 +191,6 @@ const todoRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     const { content, reviewId } = request.body
 
     const todo = repo.create({
-      id: randomUUID(),
       content,
       completed: false,
       reviewId: reviewId ?? null,

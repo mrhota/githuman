@@ -1,8 +1,8 @@
 /**
  * Review service - business logic for review management
  */
-import { randomUUID } from 'node:crypto'
 import { ReviewRepository } from '../repositories/review.repo.ts'
+import { type IdGenerator, systemIdGenerator } from '../ports.ts'
 import { ReviewFileRepository, type CreateReviewFileInput } from '../repositories/review-file.repo.ts'
 import { GitService } from './git.service.ts'
 import { parseDiff, parseSingleFileDiff, getDiffSummary, type DiffSummary } from './diff.service.ts'
@@ -48,11 +48,13 @@ export class ReviewService {
   private repo: ReviewRepository
   private fileRepo: ReviewFileRepository
   private git: GitService
+  private idGenerator: IdGenerator
 
-  constructor (reviewRepo: ReviewRepository, fileRepo: ReviewFileRepository, git: GitService) {
+  constructor (reviewRepo: ReviewRepository, fileRepo: ReviewFileRepository, git: GitService, idGenerator: IdGenerator = systemIdGenerator) {
     this.repo = reviewRepo
     this.fileRepo = fileRepo
     this.git = git
+    this.idGenerator = idGenerator
   }
 
   /**
@@ -108,7 +110,7 @@ export class ReviewService {
       throw new ReviewError('No changes to review', 'NO_CHANGES')
     }
 
-    const reviewId = randomUUID()
+    const reviewId = this.idGenerator()
 
     // For staged reviews, store hunks in review_files table
     // For committed reviews (branch/commits), only store metadata - hunks are regenerated from git
@@ -116,7 +118,7 @@ export class ReviewService {
 
     // Create file records
     const fileInputs: CreateReviewFileInput[] = files.map((file) => ({
-      id: randomUUID(),
+      id: this.idGenerator(),
       reviewId,
       filePath: file.newPath,
       oldPath: file.oldPath !== file.newPath ? file.oldPath : null,
