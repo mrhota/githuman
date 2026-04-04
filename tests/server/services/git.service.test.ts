@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
@@ -690,6 +690,182 @@ describe('git.service', () => {
 
       const files = await testGit.getWorkingDirectoryNewFiles()
       assert.ok(files.includes('src/utils/helper.ts'), 'Should include file with full path')
+    })
+  })
+
+  describe('getWorkingFileContent - directory traversal prevention', () => {
+    it('should return file contents for a valid relative path', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('README.md')
+      assert.strictEqual(content, '# Test\n')
+    })
+
+    it('should return file contents for a valid nested path', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      mkdirSync(join(tempDir, 'src'))
+      writeFileSync(join(tempDir, 'src/index.ts'), 'export const x = 1;\n')
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('src/index.ts')
+      assert.strictEqual(content, 'export const x = 1;\n')
+    })
+
+    it('should return file contents for a dot-normalized path that stays inside repo', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      mkdirSync(join(tempDir, 'src'))
+      writeFileSync(join(tempDir, 'src/index.ts'), 'export const x = 1;\n')
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('./src/../src/index.ts')
+      assert.strictEqual(content, 'export const x = 1;\n')
+    })
+
+    it('should block simple traversal with ../', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('../etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should block deep traversal with ../../', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('../../etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should block mixed traversal like src/../../etc/passwd', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('src/../../etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should block absolute paths outside repo', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('/etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should return null for nonexistent file', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('no-such-file.txt')
+      assert.strictEqual(content, null)
+    })
+
+    it('should log a warning when traversal is blocked', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const warnings: unknown[] = []
+      const logger = {
+        debug: () => {},
+        warn: (obj: unknown, _msg: string) => warnings.push(obj),
+      }
+      const git = new GitService(tempDir, logger)
+
+      await git.getWorkingFileContent('../etc/passwd')
+      assert.strictEqual(warnings.length, 1)
+      assert.deepStrictEqual((warnings[0] as Record<string, string>).filePath, '../etc/passwd')
+    })
+
+    it('should not crash when traversal is blocked without a logger', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingFileContent('../etc/passwd')
+      assert.strictEqual(content, null)
+    })
+  })
+
+  describe('getWorkingBinaryContent - directory traversal prevention', () => {
+    it('should return buffer for a valid binary file', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])
+      writeFileSync(join(tempDir, 'image.png'), binaryData)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingBinaryContent('image.png')
+      assert.ok(Buffer.isBuffer(content))
+      assert.ok(content.equals(binaryData))
+    })
+
+    it('should block traversal with ../', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingBinaryContent('../outside.bin')
+      assert.strictEqual(content, null)
+    })
+
+    it('should block absolute paths outside repo', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingBinaryContent('/etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should block mixed traversal', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingBinaryContent('src/../../etc/passwd')
+      assert.strictEqual(content, null)
+    })
+
+    it('should return null for nonexistent file', async (t) => {
+      const tempDir = createTestRepoWithCommit(t)
+      const git = new GitService(tempDir)
+
+      const content = await git.getWorkingBinaryContent('no-such-file.bin')
+      assert.strictEqual(content, null)
+    })
+  })
+
+  describe('sanitizeSearch - regex injection prevention', () => {
+    it('should pass through normal search text', async (t) => {
+      const tempDir = createTestRepoWithMultipleCommits(t)
+      const git = new GitService(tempDir)
+
+      const result = await git.getCommits({ limit: 10, search: 'First' })
+      assert.ok(result.commits.length >= 1)
+      assert.ok(result.commits.some(c => c.message.includes('First')))
+    })
+
+    it('should not crash with regex metacharacters in search', async (t) => {
+      const tempDir = createTestRepoWithMultipleCommits(t)
+      const git = new GitService(tempDir)
+
+      const result = await git.getCommits({ limit: 10, search: '*+?[]{}()^$|\\' })
+      assert.ok(Array.isArray(result.commits))
+    })
+
+    it('should handle very long search strings without error', async (t) => {
+      const tempDir = createTestRepoWithMultipleCommits(t)
+      const git = new GitService(tempDir)
+
+      const longSearch = 'a'.repeat(150)
+      const result = await git.getCommits({ limit: 10, search: longSearch })
+      assert.ok(Array.isArray(result.commits))
+    })
+
+    it('should preserve safe punctuation in search', async (t) => {
+      const tempDir = createTestRepo(t)
+      writeFileSync(join(tempDir, 'file.txt'), 'content\n')
+      execSync('git add file.txt', { cwd: tempDir, stdio: 'ignore' })
+      execSync('git commit -m "it\'s a \\"test\\""', { cwd: tempDir, stdio: 'ignore' })
+      const git = new GitService(tempDir)
+
+      const result = await git.getCommits({ limit: 10, search: "it's" })
+      assert.ok(result.commits.length >= 1)
     })
   })
 
