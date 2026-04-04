@@ -39,6 +39,7 @@ export class ReviewRepository {
   private stmtCountAll: StatementSync
   private stmtCountByStatus: StatementSync
   private stmtCountByRepo: StatementSync
+  private stmtFindLastId: StatementSync
 
   constructor (db: DatabaseSync) {
     this.db = db
@@ -74,6 +75,10 @@ export class ReviewRepository {
 
     this.stmtCountByRepo = db.prepare(`
       SELECT COUNT(*) as count FROM reviews WHERE repository_path = ?
+    `)
+
+    this.stmtFindLastId = db.prepare(`
+      SELECT id FROM reviews ORDER BY created_at DESC LIMIT 1
     `)
   }
 
@@ -187,5 +192,10 @@ export class ReviewRepository {
   countAll (): number {
     const result = this.stmtCountAll.get() as { count: number }
     return result.count
+  }
+
+  findLastId (): string | null {
+    const row = this.stmtFindLastId.get() as { id: string } | undefined
+    return row?.id ?? null
   }
 }

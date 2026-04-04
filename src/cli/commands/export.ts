@@ -27,12 +27,6 @@ Options:
 `)
 }
 
-function getLastReviewId (db: ReturnType<typeof getDatabase>): string | null {
-  const stmt = db.prepare('SELECT id FROM reviews ORDER BY created_at DESC LIMIT 1')
-  const row = stmt.get() as { id: string } | undefined
-  return row?.id ?? null
-}
-
 export async function exportCommand (args: string[]) {
   const { values, positionals } = parseArgs({
     args,
@@ -66,7 +60,8 @@ export async function exportCommand (args: string[]) {
 
     // Handle "last" keyword
     if (reviewId === 'last') {
-      const lastId = getLastReviewId(db)
+      const reviewRepo = new ReviewRepository(db)
+      const lastId = reviewRepo.findLastId()
       if (!lastId) {
         console.error('Error: No reviews found')
         process.exit(1)

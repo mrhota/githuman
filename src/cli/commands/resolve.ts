@@ -4,6 +4,11 @@
 import { parseArgs } from 'node:util'
 import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
+import { ReviewRepository } from '../../server/repositories/review.repo.ts'
+import { ReviewFileRepository } from '../../server/repositories/review-file.repo.ts'
+import { CommentRepository } from '../../server/repositories/comment.repo.ts'
+import { ReviewService, ReviewError } from '../../server/services/review.service.ts'
+import { GitService } from '../../server/services/git.service.ts'
 
 function printHelp () {
   console.log(`
@@ -18,12 +23,6 @@ Options:
   --json                 Output as JSON
   -h, --help             Show this help message
 `)
-}
-
-function getLastReviewId (db: ReturnType<typeof getDatabase>): string | null {
-  const stmt = db.prepare('SELECT id FROM reviews ORDER BY created_at DESC LIMIT 1')
-  const row = stmt.get() as { id: string } | undefined
-  return row?.id ?? null
 }
 
 interface ResolveResult {
@@ -62,10 +61,15 @@ export async function resolveCommand (args: string[]) {
   try {
     initDatabase(config.dbPath)
     const db = getDatabase()
+    const reviewRepo = new ReviewRepository(db)
+    const fileRepo = new ReviewFileRepository(db)
+    const commentRepo = new CommentRepository(db)
+    const git = new GitService(process.cwd())
+    const reviewService = new ReviewService(reviewRepo, fileRepo, git)
 
     // Handle "last" keyword
     if (reviewId === 'last') {
-      const lastId = getLastReviewId(db)
+      const lastId = reviewRepo.findLastId()
       if (!lastId) {
         console.error('Error: No reviews found')
         process.exit(1)
@@ -73,10 +77,8 @@ export async function resolveCommand (args: string[]) {
       reviewId = lastId
     }
 
-    // Get current review
-    const reviewStmt = db.prepare('SELECT id, status FROM reviews WHERE id = ?')
-    const review = reviewStmt.get(reviewId) as { id: string; status: string } | undefined
-
+    // Get current review to capture previous status
+    const review = reviewRepo.findById(reviewId)
     if (!review) {
       console.error(`Error: Review not found: ${reviewId}`)
       process.exit(1)
@@ -84,24 +86,30 @@ export async function resolveCommand (args: string[]) {
 
     const previousStatus = review.status
 
-    // Update review status to approved
-    const now = new Date().toISOString()
-    const updateReviewStmt = db.prepare('UPDATE reviews SET status = ?, updated_at = ? WHERE id = ?')
-    updateReviewStmt.run('approved', now, reviewId)
+    // Reject if already approved (terminal state - no valid transitions out)
+    if (previousStatus === 'approved') {
+      console.error('Error: Invalid status transition from \'approved\' to \'approved\'. Review is already approved.')
+      process.exit(1)
+    }
 
-    // Get all comments for this review
-    const commentsStmt = db.prepare('SELECT id, resolved FROM comments WHERE review_id = ?')
-    const comments = commentsStmt.all(reviewId) as Array<{ id: string; resolved: number }>
+    // Update review status via service layer (enforces VALID_TRANSITIONS)
+    try {
+      reviewService.update(reviewId, { status: 'approved' })
+    } catch (err) {
+      if (err instanceof ReviewError && err.code === 'INVALID_TRANSITION') {
+        console.error(`Error: ${err.message}`)
+        process.exit(1)
+      }
+      throw err
+    }
 
     // Resolve all unresolved comments
+    const comments = commentRepo.findByReview(reviewId)
     const unresolvedComments = comments.filter((c) => !c.resolved)
     const alreadyResolved = comments.length - unresolvedComments.length
 
-    if (unresolvedComments.length > 0) {
-      const resolveStmt = db.prepare('UPDATE comments SET resolved = 1, updated_at = ? WHERE id = ?')
-      for (const comment of unresolvedComments) {
-        resolveStmt.run(now, comment.id)
-      }
+    for (const comment of unresolvedComments) {
+      commentRepo.setResolved(comment.id, true)
     }
 
     const result: ResolveResult = {
