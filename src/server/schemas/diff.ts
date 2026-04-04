@@ -3,8 +3,13 @@
  */
 import { Type } from '@fastify/type-provider-typebox'
 
+export const LineTypeSchema = Type.Union(
+  [Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')],
+  { description: 'Diff line type' }
+)
+
 export const DiffLineSchema = Type.Object({
-  type: Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')]),
+  type: LineTypeSchema,
   content: Type.String(),
   oldLineNumber: Type.Union([Type.Integer(), Type.Null()]),
   newLineNumber: Type.Union([Type.Integer(), Type.Null()]),

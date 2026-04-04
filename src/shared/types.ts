@@ -17,13 +17,14 @@ export interface Review {
 export type ReviewStatus = 'in_progress' | 'approved' | 'changes_requested'
 export type ReviewSourceType = 'staged' | 'branch' | 'commits'
 export type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed'
+export type LineType = 'added' | 'removed' | 'context'
 
 export interface Comment {
   id: string;
   reviewId: string;
   filePath: string;
   lineNumber: number | null; // null for file-level comments
-  lineType: 'added' | 'removed' | 'context' | null;
+  lineType: LineType | null;
   content: string;
   suggestion: string | null;
   /** Whether the reviewer's concern has been addressed (the discussion is settled). */
@@ -98,7 +99,7 @@ export interface UpdateReviewRequest {
 export interface CreateCommentRequest {
   filePath: string;
   lineNumber?: number;
-  lineType?: 'added' | 'removed' | 'context';
+  lineType?: LineType;
   content: string;
   suggestion?: string;
 }
