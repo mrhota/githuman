@@ -25,13 +25,13 @@ export function ImageDiff ({ file }: ImageDiffProps) {
   const newPath = file.newPath
 
   // Build image URLs
-  const oldImageUrl = file.status !== 'added' ? `/api/diff/image/${oldPath}?version=head` : null
-  const newImageUrl = file.status !== 'deleted' ? `/api/diff/image/${newPath}?version=staged` : null
+  const oldImageUrl = file.changeType !== 'added' ? `/api/diff/image/${oldPath}?version=head` : null
+  const newImageUrl = file.changeType !== 'deleted' ? `/api/diff/image/${newPath}?version=staged` : null
 
   return (
     <div className='p-4'>
       {/* View mode toggle for modified files */}
-      {file.status === 'modified' && oldImageUrl && newImageUrl && (
+      {file.changeType === 'modified' && oldImageUrl && newImageUrl && (
         <div className='flex items-center justify-center gap-4 mb-4'>
           <button
             onClick={() => setViewMode('side-by-side')}
@@ -59,7 +59,7 @@ export function ImageDiff ({ file }: ImageDiffProps) {
       )}
 
       {/* Added file - show new image */}
-      {file.status === 'added' && newImageUrl && (
+      {file.changeType === 'added' && newImageUrl && (
         <div className='flex flex-col items-center gap-2'>
           <span className='text-sm font-medium text-[var(--gh-diff-add-text)]'>New Image</span>
           <ImageWithDimensions src={newImageUrl} alt={`Added: ${filePath}`} />
@@ -67,7 +67,7 @@ export function ImageDiff ({ file }: ImageDiffProps) {
       )}
 
       {/* Deleted file - show old image */}
-      {file.status === 'deleted' && oldImageUrl && (
+      {file.changeType === 'deleted' && oldImageUrl && (
         <div className='flex flex-col items-center gap-2'>
           <span className='text-sm font-medium text-[var(--gh-diff-remove-text)]'>Deleted Image</span>
           <ImageWithDimensions src={oldImageUrl} alt={`Deleted: ${filePath}`} />
@@ -75,7 +75,7 @@ export function ImageDiff ({ file }: ImageDiffProps) {
       )}
 
       {/* Modified file - side by side view */}
-      {(file.status === 'modified' || file.status === 'renamed') && viewMode === 'side-by-side' && (
+      {(file.changeType === 'modified' || file.changeType === 'renamed') && viewMode === 'side-by-side' && (
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           {oldImageUrl && (
             <div className='flex flex-col items-center gap-2 p-3 bg-[var(--gh-diff-remove-bg)] rounded-lg'>
@@ -93,7 +93,7 @@ export function ImageDiff ({ file }: ImageDiffProps) {
       )}
 
       {/* Modified file - overlay view */}
-      {file.status === 'modified' && viewMode === 'overlay' && oldImageUrl && newImageUrl && (
+      {file.changeType === 'modified' && viewMode === 'overlay' && oldImageUrl && newImageUrl && (
         <div className='flex flex-col items-center gap-4'>
           <div className='relative inline-block'>
             <img
