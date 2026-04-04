@@ -6,6 +6,9 @@ import { writeFileSync } from 'node:fs'
 import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ExportService } from '../../server/services/export.service.ts'
+import { ReviewRepository } from '../../server/repositories/review.repo.ts'
+import { ReviewFileRepository } from '../../server/repositories/review-file.repo.ts'
+import { CommentRepository } from '../../server/repositories/comment.repo.ts'
 
 function printHelp () {
   console.log(`
@@ -71,7 +74,11 @@ export async function exportCommand (args: string[]) {
       reviewId = lastId
     }
 
-    const exportService = new ExportService(db)
+    const exportService = new ExportService(
+      new ReviewRepository(db),
+      new ReviewFileRepository(db),
+      new CommentRepository(db),
+    )
 
     const markdown = exportService.exportToMarkdown(reviewId, {
       includeResolved: !values['no-resolved'],

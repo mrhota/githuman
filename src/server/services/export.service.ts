@@ -1,7 +1,6 @@
 /**
  * Export service - generates markdown reports from reviews
  */
-import type { DatabaseSync } from 'node:sqlite'
 import { ReviewRepository } from '../repositories/review.repo.ts'
 import { ReviewFileRepository } from '../repositories/review-file.repo.ts'
 import { CommentRepository } from '../repositories/comment.repo.ts'
@@ -36,10 +35,10 @@ export class ExportService {
   private fileRepo: ReviewFileRepository
   private commentRepo: CommentRepository
 
-  constructor (db: DatabaseSync) {
-    this.reviewRepo = new ReviewRepository(db)
-    this.fileRepo = new ReviewFileRepository(db)
-    this.commentRepo = new CommentRepository(db)
+  constructor (reviewRepo: ReviewRepository, fileRepo: ReviewFileRepository, commentRepo: CommentRepository) {
+    this.reviewRepo = reviewRepo
+    this.fileRepo = fileRepo
+    this.commentRepo = commentRepo
   }
 
   /**

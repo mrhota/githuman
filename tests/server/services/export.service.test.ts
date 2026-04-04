@@ -3,6 +3,7 @@ import assert from 'node:assert'
 import { DatabaseSync } from 'node:sqlite'
 import { ExportService } from '../../../src/server/services/export.service.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
+import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
 import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
 import { migrate, migrations } from '../../../src/server/db/migrations.ts'
 
@@ -17,9 +18,10 @@ describe('ExportService', () => {
     db = new DatabaseSync(':memory:')
     db.exec('PRAGMA foreign_keys = ON')
     migrate(db, migrations)
-    exportService = new ExportService(db)
     reviewRepo = new ReviewRepository(db)
+    const fileRepo = new ReviewFileRepository(db)
     commentRepo = new CommentRepository(db)
+    exportService = new ExportService(reviewRepo, fileRepo, commentRepo)
 
     // Create a test review with diff data
     const snapshotData = JSON.stringify({

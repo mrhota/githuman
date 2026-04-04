@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process'
 import { ReviewService, ReviewError } from '../../../src/server/services/review.service.ts'
 import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
+import { GitService } from '../../../src/server/services/git.service.ts'
 import { migrate, migrations } from '../../../src/server/db/migrations.ts'
 
 interface TestContext {
@@ -50,7 +51,7 @@ describe('ReviewService', () => {
   describe('create', () => {
     it('should create a staged review with files in review_files table', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')
@@ -78,7 +79,7 @@ describe('ReviewService', () => {
 
     it('should create a commits review WITHOUT hunks stored', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Add a file and commit
       writeFileSync(join(tempDir, 'feature.ts'), 'const y = 2;\n')
@@ -106,7 +107,7 @@ describe('ReviewService', () => {
 
     it('should create a branch review WITHOUT hunks stored', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Get the main branch name
       const mainBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: tempDir }).toString().trim()
@@ -132,7 +133,7 @@ describe('ReviewService', () => {
 
     it('should throw error when no staged changes', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       await assert.rejects(
         () => service.create({ sourceType: 'staged' }),
@@ -148,7 +149,7 @@ describe('ReviewService', () => {
   describe('getById', () => {
     it('should return files without hunks property', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')
@@ -172,7 +173,7 @@ describe('ReviewService', () => {
 
     it('should return null for non-existent review', (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       const review = service.getById('non-existent-id')
       assert.strictEqual(review, null)
@@ -182,7 +183,7 @@ describe('ReviewService', () => {
   describe('getFileHunks', () => {
     it('should return hunks for staged review from database', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\nconst y = 2;\n')
@@ -201,7 +202,7 @@ describe('ReviewService', () => {
 
     it('should regenerate hunks for committed review from git', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Add a file and commit
       writeFileSync(join(tempDir, 'feature.ts'), 'const y = 2;\n')
@@ -219,7 +220,7 @@ describe('ReviewService', () => {
 
     it('should regenerate hunks for branch review from git', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Get the main branch name
       const mainBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: tempDir }).toString().trim()
@@ -241,7 +242,7 @@ describe('ReviewService', () => {
 
     it('should return empty array for non-existent file', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')
@@ -255,7 +256,7 @@ describe('ReviewService', () => {
 
     it('should throw error for non-existent review', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       await assert.rejects(
         () => service.getFileHunks('non-existent-id', 'test.ts'),
@@ -315,7 +316,7 @@ describe('ReviewService', () => {
         status: 'in_progress',
       })
 
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // getById should work with legacy format
       const review = service.getById('legacy-review-1')
@@ -371,7 +372,7 @@ describe('ReviewService', () => {
         status: 'in_progress',
       })
 
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // getFileHunks should return hunks from legacy snapshot
       const hunks = await service.getFileHunks('legacy-review-2', 'legacy.ts')
@@ -383,7 +384,7 @@ describe('ReviewService', () => {
   describe('delete', () => {
     it('should delete review and its files', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')
@@ -409,7 +410,7 @@ describe('ReviewService', () => {
   describe('list', () => {
     it('should return reviews with summary', async (t) => {
       const tempDir = createTestRepo(t)
-      const service = new ReviewService(db, tempDir)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
 
       // Stage a change
       writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')

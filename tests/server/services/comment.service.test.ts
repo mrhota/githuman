@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert'
 import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
+import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
 import { CommentService, CommentError } from '../../../src/server/services/comment.service.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import { randomUUID } from 'node:crypto'
@@ -28,8 +29,8 @@ describe('CommentService', () => {
 
   before(() => {
     db = createTestDatabase()
-    service = new CommentService(db)
     reviewRepo = new ReviewRepository(db)
+    service = new CommentService(new CommentRepository(db), reviewRepo)
     reviewId = createReview(reviewRepo)
   })
 
