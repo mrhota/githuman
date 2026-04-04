@@ -190,7 +190,7 @@ describe('Clock injection into repositories', () => {
         id: 'f-1',
         reviewId: 'r-1',
         filePath: 'test.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 10,
         deletions: 0,
       })
@@ -212,8 +212,8 @@ describe('Clock injection into repositories', () => {
 
       const repo = new ReviewFileRepository(db, fakeClock)
       repo.createBulk([
-        { id: 'f-1', reviewId: 'r-1', filePath: 'a.ts', status: 'added', additions: 1, deletions: 0 },
-        { id: 'f-2', reviewId: 'r-1', filePath: 'b.ts', status: 'modified', additions: 2, deletions: 1 },
+        { id: 'f-1', reviewId: 'r-1', filePath: 'a.ts', changeType: 'added', additions: 1, deletions: 0 },
+        { id: 'f-2', reviewId: 'r-1', filePath: 'b.ts', changeType: 'modified', additions: 2, deletions: 1 },
       ])
 
       const file1 = repo.findByReviewAndPath('r-1', 'a.ts')

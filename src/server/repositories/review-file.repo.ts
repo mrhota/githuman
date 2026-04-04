@@ -3,7 +3,7 @@
  * Stores per-file diff data for lazy loading
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
-import type { DiffHunk } from '../../shared/types.ts'
+import type { DiffHunk, FileChangeType } from '../../shared/types.ts'
 import { type Clock, systemClock } from '../ports.ts'
 
 export interface ReviewFile {
@@ -11,7 +11,7 @@ export interface ReviewFile {
   reviewId: string;
   filePath: string;
   oldPath: string | null;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
   hunksData: string | null; // JSON-encoded DiffHunk[], null for committed reviews
@@ -23,7 +23,7 @@ export interface ReviewFileMetadata {
   reviewId: string;
   filePath: string;
   oldPath: string | null;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
   createdAt: string;
@@ -34,7 +34,7 @@ export interface CreateReviewFileInput {
   reviewId: string;
   filePath: string;
   oldPath?: string | null;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
   hunksData?: string | null;
@@ -58,7 +58,7 @@ function rowToReviewFile (row: ReviewFileRow): ReviewFile {
     reviewId: row.review_id,
     filePath: row.file_path,
     oldPath: row.old_path,
-    status: row.status as ReviewFile['status'],
+    changeType: row.status as ReviewFile['changeType'],
     additions: row.additions,
     deletions: row.deletions,
     hunksData: row.hunks_data,
@@ -72,7 +72,7 @@ function rowToReviewFileMetadata (row: ReviewFileRow): ReviewFileMetadata {
     reviewId: row.review_id,
     filePath: row.file_path,
     oldPath: row.old_path,
-    status: row.status as ReviewFileMetadata['status'],
+    changeType: row.status as ReviewFileMetadata['changeType'],
     additions: row.additions,
     deletions: row.deletions,
     createdAt: row.created_at,
@@ -147,7 +147,7 @@ export class ReviewFileRepository {
       file.reviewId,
       file.filePath,
       file.oldPath ?? null,
-      file.status,
+      file.changeType,
       file.additions,
       file.deletions,
       file.hunksData ?? null,
@@ -173,7 +173,7 @@ export class ReviewFileRepository {
           file.reviewId,
           file.filePath,
           file.oldPath ?? null,
-          file.status,
+          file.changeType,
           file.additions,
           file.deletions,
           file.hunksData ?? null,

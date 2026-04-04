@@ -3,8 +3,13 @@
  */
 import { Type } from '@fastify/type-provider-typebox'
 
+export const LineTypeSchema = Type.Union(
+  [Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')],
+  { description: 'Diff line type' }
+)
+
 export const DiffLineSchema = Type.Object({
-  type: Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')]),
+  type: LineTypeSchema,
   content: Type.String(),
   oldLineNumber: Type.Union([Type.Integer(), Type.Null()]),
   newLineNumber: Type.Union([Type.Integer(), Type.Null()]),
@@ -18,7 +23,7 @@ export const DiffHunkSchema = Type.Object({
   lines: Type.Array(DiffLineSchema),
 })
 
-const FileStatusSchema = Type.Union([
+const FileChangeTypeSchema = Type.Union([
   Type.Literal('added'),
   Type.Literal('modified'),
   Type.Literal('deleted'),
@@ -29,7 +34,7 @@ export const DiffFileMetadataSchema = Type.Object(
   {
     oldPath: Type.String({ description: 'Original file path' }),
     newPath: Type.String({ description: 'New file path' }),
-    status: FileStatusSchema,
+    changeType: FileChangeTypeSchema,
     additions: Type.Integer({ description: 'Number of lines added' }),
     deletions: Type.Integer({ description: 'Number of lines deleted' }),
   },
@@ -40,7 +45,7 @@ export const DiffFileSchema = Type.Object(
   {
     oldPath: Type.String({ description: 'Original file path' }),
     newPath: Type.String({ description: 'New file path' }),
-    status: FileStatusSchema,
+    changeType: FileChangeTypeSchema,
     additions: Type.Integer({ description: 'Number of lines added' }),
     deletions: Type.Integer({ description: 'Number of lines deleted' }),
     hunks: Type.Array(DiffHunkSchema),

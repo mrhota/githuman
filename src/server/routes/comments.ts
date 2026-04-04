@@ -4,6 +4,7 @@
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { CommentError } from '../services/comment.service.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
+import { LineTypeSchema } from '../schemas/diff.ts'
 
 const CommentSchema = Type.Object(
   {
@@ -13,10 +14,7 @@ const CommentSchema = Type.Object(
     lineNumber: Type.Union([Type.Integer(), Type.Null()], {
       description: 'Line number (null for file-level comments)',
     }),
-    lineType: Type.Union(
-      [Type.Literal('added'), Type.Literal('removed'), Type.Literal('context'), Type.Null()],
-      { description: 'Line type' }
-    ),
+    lineType: Type.Union([LineTypeSchema, Type.Null()], { description: 'Line type' }),
     content: Type.String({ description: 'Comment content' }),
     suggestion: Type.Union([Type.String(), Type.Null()], {
       description: 'Code suggestion',
@@ -36,9 +34,7 @@ const CreateCommentSchema = Type.Object(
   {
     filePath: Type.String({ description: 'File path' }),
     lineNumber: Type.Optional(Type.Integer({ description: 'Line number' })),
-    lineType: Type.Optional(
-      Type.Union([Type.Literal('added'), Type.Literal('removed'), Type.Literal('context')])
-    ),
+    lineType: Type.Optional(LineTypeSchema),
     content: Type.String({ minLength: 1, description: 'Comment content' }),
     suggestion: Type.Optional(Type.String({ description: 'Code suggestion' })),
   },

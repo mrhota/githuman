@@ -21,7 +21,7 @@ function hasHunks (file: DiffFileMetadata | DiffFileType): file is DiffFileType 
   return 'hunks' in file && Array.isArray(file.hunks)
 }
 
-function getStatusBadge (status: DiffFileMetadata['status']) {
+function getStatusBadge (changeType: DiffFileMetadata['changeType']) {
   const styles = {
     added: 'gh-badge gh-badge-success',
     deleted: 'gh-badge gh-badge-error',
@@ -37,8 +37,8 @@ function getStatusBadge (status: DiffFileMetadata['status']) {
   }
 
   return (
-    <span className={styles[status]}>
-      {labels[status]}
+    <span className={styles[changeType]}>
+      {labels[changeType]}
     </span>
   )
 }
@@ -53,7 +53,7 @@ export function DiffFile ({ file, reviewId, defaultExpanded = true, forceExpande
   const isExpanded = forceExpanded || expanded
   const [viewMode, setViewMode] = useState<'diff' | 'full'>('diff')
 
-  const displayPath = file.status === 'renamed'
+  const displayPath = file.changeType === 'renamed'
     ? `${file.oldPath} → ${file.newPath}`
     : file.newPath || file.oldPath
 
@@ -93,7 +93,7 @@ export function DiffFile ({ file, reviewId, defaultExpanded = true, forceExpande
   const isMarkdown = isMarkdownFile(filePath)
 
   // Can only show full file for added or modified files (not deleted) and non-image/non-markdown files
-  const canShowFullFile = !isImage && !isMarkdown && (file.status === 'added' || file.status === 'modified' || file.status === 'renamed')
+  const canShowFullFile = !isImage && !isMarkdown && (file.changeType === 'added' || file.changeType === 'modified' || file.changeType === 'renamed')
 
   // For image and markdown diffs, we need a full DiffFile with hunks
   const fileWithHunks: DiffFileType = hasHunks(file)
@@ -118,7 +118,7 @@ export function DiffFile ({ file, reviewId, defaultExpanded = true, forceExpande
           <span className='font-mono text-xs sm:text-sm text-[var(--gh-text-primary)] flex-1 truncate min-w-0'>
             {displayPath}
           </span>
-          <span className='hidden sm:inline-block'>{getStatusBadge(file.status)}</span>
+          <span className='hidden sm:inline-block'>{getStatusBadge(file.changeType)}</span>
           <span className='text-xs sm:text-sm shrink-0 font-mono'>
             <span className='text-[var(--gh-success)]'>+{file.additions}</span>
             <span className='text-[var(--gh-text-muted)]'>{' / '}</span>
@@ -189,7 +189,7 @@ export function DiffFile ({ file, reviewId, defaultExpanded = true, forceExpande
                   : !hunks || hunks.length === 0
                       ? (
                         <div className='p-4 text-center text-[var(--gh-text-muted)] text-sm'>
-                          {file.status === 'renamed' ? 'File renamed (no content changes)' : 'No changes to display'}
+                          {file.changeType === 'renamed' ? 'File renamed (no content changes)' : 'No changes to display'}
                         </div>
                         )
                       : viewMode === 'full' && canShowFullFile

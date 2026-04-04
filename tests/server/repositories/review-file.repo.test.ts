@@ -42,7 +42,7 @@ describe('ReviewFileRepository', () => {
         reviewId: testReviewId,
         filePath: 'src/index.ts',
         oldPath: null,
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
         hunksData: JSON.stringify([{ oldStart: 1, oldLines: 5, newStart: 1, newLines: 10, lines: [] }]),
@@ -52,7 +52,7 @@ describe('ReviewFileRepository', () => {
       assert.strictEqual(file.reviewId, testReviewId)
       assert.strictEqual(file.filePath, 'src/index.ts')
       assert.strictEqual(file.oldPath, null)
-      assert.strictEqual(file.status, 'modified')
+      assert.strictEqual(file.changeType, 'modified')
       assert.strictEqual(file.additions, 10)
       assert.strictEqual(file.deletions, 5)
       assert.ok(file.hunksData)
@@ -65,13 +65,13 @@ describe('ReviewFileRepository', () => {
         reviewId: testReviewId,
         filePath: 'src/newname.ts',
         oldPath: 'src/oldname.ts',
-        status: 'renamed',
+        changeType: 'renamed',
         additions: 0,
         deletions: 0,
       })
 
       assert.strictEqual(file.oldPath, 'src/oldname.ts')
-      assert.strictEqual(file.status, 'renamed')
+      assert.strictEqual(file.changeType, 'renamed')
     })
 
     it('should create a file without hunks data', () => {
@@ -79,7 +79,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-3',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 100,
         deletions: 0,
       })
@@ -95,7 +95,7 @@ describe('ReviewFileRepository', () => {
           id: 'file-1',
           reviewId: testReviewId,
           filePath: 'src/a.ts',
-          status: 'added',
+          changeType: 'added',
           additions: 10,
           deletions: 0,
           hunksData: '[]',
@@ -104,7 +104,7 @@ describe('ReviewFileRepository', () => {
           id: 'file-2',
           reviewId: testReviewId,
           filePath: 'src/b.ts',
-          status: 'modified',
+          changeType: 'modified',
           additions: 5,
           deletions: 3,
           hunksData: '[]',
@@ -113,7 +113,7 @@ describe('ReviewFileRepository', () => {
           id: 'file-3',
           reviewId: testReviewId,
           filePath: 'src/c.ts',
-          status: 'deleted',
+          changeType: 'deleted',
           additions: 0,
           deletions: 20,
           hunksData: '[]',
@@ -136,7 +136,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 10,
         deletions: 0,
       })
@@ -148,7 +148,7 @@ describe('ReviewFileRepository', () => {
             id: 'file-2',
             reviewId: testReviewId,
             filePath: 'src/b.ts',
-            status: 'added',
+            changeType: 'added',
             additions: 5,
             deletions: 0,
           },
@@ -156,7 +156,7 @@ describe('ReviewFileRepository', () => {
             id: 'file-1', // Duplicate id
             reviewId: testReviewId,
             filePath: 'src/c.ts',
-            status: 'added',
+            changeType: 'added',
             additions: 3,
             deletions: 0,
           },
@@ -176,7 +176,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 10,
         deletions: 0,
         hunksData: '[{"oldStart":1,"oldLines":0,"newStart":1,"newLines":10,"lines":[]}]',
@@ -185,7 +185,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 5,
         deletions: 3,
         hunksData: '[{"oldStart":1,"oldLines":3,"newStart":1,"newLines":5,"lines":[]}]',
@@ -200,7 +200,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
         hunksData: '[{"oldStart":1,"oldLines":5,"newStart":1,"newLines":10,"lines":[]}]',
@@ -217,7 +217,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/z.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 1,
         deletions: 0,
       })
@@ -225,7 +225,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-2',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 1,
         deletions: 0,
       })
@@ -233,7 +233,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-3',
         reviewId: testReviewId,
         filePath: 'src/m.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 1,
         deletions: 0,
       })
@@ -257,7 +257,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
         hunksData,
@@ -279,7 +279,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
       })
@@ -295,7 +295,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 10,
         deletions: 0,
       })
@@ -303,7 +303,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 5,
         deletions: 3,
       })
@@ -325,7 +325,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
       })
@@ -345,7 +345,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/index.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 10,
         deletions: 5,
       })
@@ -356,7 +356,7 @@ describe('ReviewFileRepository', () => {
           id: 'file-2',
           reviewId: testReviewId,
           filePath: 'src/index.ts', // Same path
-          status: 'added',
+          changeType: 'added',
           additions: 5,
           deletions: 0,
         })
@@ -370,7 +370,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        status: 'added',
+        changeType: 'added',
         additions: 10,
         deletions: 0,
       })
@@ -378,7 +378,7 @@ describe('ReviewFileRepository', () => {
         id: 'file-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
-        status: 'modified',
+        changeType: 'modified',
         additions: 5,
         deletions: 3,
       })

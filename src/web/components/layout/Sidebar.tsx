@@ -18,8 +18,8 @@ interface SidebarProps {
   onMobileDrawerChange?: (open: boolean) => void;
 }
 
-function getStatusColor (status: DiffFileMetadata['status']) {
-  switch (status) {
+function getStatusColor (changeType: DiffFileMetadata['changeType']) {
+  switch (changeType) {
     case 'added':
       return 'text-[var(--gh-success)]'
     case 'deleted':
@@ -33,8 +33,8 @@ function getStatusColor (status: DiffFileMetadata['status']) {
   }
 }
 
-function getStatusLabel (status: DiffFileMetadata['status']) {
-  switch (status) {
+function getStatusLabel (changeType: DiffFileMetadata['changeType']) {
+  switch (changeType) {
     case 'added':
       return 'A'
     case 'deleted':
@@ -136,8 +136,8 @@ export function Sidebar ({ files, selectedFile, onFileSelect, selectedIndex, sho
                           isHighlighted && !isSelected && 'ring-1 ring-[var(--gh-accent-primary)]'
                         )}
                       >
-                        <span className={cn('font-mono text-xs font-semibold shrink-0', getStatusColor(file.status))}>
-                          {getStatusLabel(file.status)}
+                        <span className={cn('font-mono text-xs font-semibold shrink-0', getStatusColor(file.changeType))}>
+                          {getStatusLabel(file.changeType)}
                         </span>
                         <span className='truncate flex-1 font-mono text-xs' title={path}>
                           {path}

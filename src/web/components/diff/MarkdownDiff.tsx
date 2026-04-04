@@ -26,7 +26,7 @@ export function MarkdownDiff ({ file, allowComments = false, onLineClick, versio
   const [fileContent, setFileContent] = useState<FileContent | null>(null)
 
   const filePath = file.newPath || file.oldPath
-  const canShowPreview = file.status !== 'deleted'
+  const canShowPreview = file.changeType !== 'deleted'
 
   useEffect(() => {
     if (viewMode === 'diff') {

@@ -17,7 +17,7 @@ describe('DiffView', () => {
     {
       oldPath: 'file1.ts',
       newPath: 'file1.ts',
-      status: 'modified',
+      changeType: 'modified',
       additions: 3,
       deletions: 1,
       hunks: [],
@@ -25,7 +25,7 @@ describe('DiffView', () => {
     {
       oldPath: 'file2.ts',
       newPath: 'file2.ts',
-      status: 'added',
+      changeType: 'added',
       additions: 10,
       deletions: 0,
       hunks: [],
@@ -66,7 +66,7 @@ describe('DiffView', () => {
     expect(screen.getByText('deletions')).toBeDefined()
   })
 
-  it('shows file counts by status in summary', () => {
+  it('shows file counts by changeType in summary', () => {
     renderWithProvider(<DiffView files={mockFiles} summary={mockSummary} />)
 
     expect(screen.getByText('1 added')).toBeDefined()

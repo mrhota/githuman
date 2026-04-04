@@ -9,7 +9,7 @@ describe('Sidebar', () => {
     {
       oldPath: 'src/app.ts',
       newPath: 'src/app.ts',
-      status: 'modified',
+      changeType: 'modified',
       additions: 5,
       deletions: 2,
       hunks: [],
@@ -17,7 +17,7 @@ describe('Sidebar', () => {
     {
       oldPath: 'src/utils.ts',
       newPath: 'src/utils.ts',
-      status: 'added',
+      changeType: 'added',
       additions: 10,
       deletions: 0,
       hunks: [],
@@ -25,7 +25,7 @@ describe('Sidebar', () => {
     {
       oldPath: 'src/old.ts',
       newPath: 'src/old.ts',
-      status: 'deleted',
+      changeType: 'deleted',
       additions: 0,
       deletions: 15,
       hunks: [],
@@ -61,7 +61,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('src/old.ts')).toBeDefined()
   })
 
-  it('renders status indicators', () => {
+  it('renders changeType indicators', () => {
     renderSidebar({ files: mockFiles, onFileSelect: () => {} })
 
     expect(screen.getByText('M')).toBeDefined() // Modified

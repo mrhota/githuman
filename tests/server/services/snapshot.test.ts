@@ -19,7 +19,7 @@ const validRepo: RepositoryInfo = {
 const validV1Files: DiffFile[] = [{
   oldPath: 'a.ts',
   newPath: 'a.ts',
-  status: 'modified',
+  changeType: 'modified',
   additions: 1,
   deletions: 0,
   hunks: [],
@@ -167,7 +167,7 @@ describe('snapshot data parsing — proving data corruption risks', () => {
 
       assert.ok('files' in result)
       assert.strictEqual(result.files[0].newPath, 'a.ts')
-      assert.strictEqual(result.files[0].status, 'modified')
+      assert.strictEqual(result.files[0].changeType, 'modified')
     })
 
     it('should use isV2Snapshot type guard correctly', async () => {

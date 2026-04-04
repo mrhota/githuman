@@ -71,18 +71,18 @@ function parseFileDiff (fileDiff: string): DiffFile | null {
   const oldPath = pathMatch[1]
   const newPath = pathMatch[2]
 
-  // Determine file status
-  let status: DiffFile['status'] = 'modified'
+  // Determine file change type
+  let changeType: DiffFile['changeType'] = 'modified'
   const hasOldMode = lines.some((l) => l.startsWith('deleted file mode'))
   const hasNewMode = lines.some((l) => l.startsWith('new file mode'))
   const hasRename = lines.some((l) => l.startsWith('rename from'))
 
   if (hasOldMode) {
-    status = 'deleted'
+    changeType = 'deleted'
   } else if (hasNewMode) {
-    status = 'added'
+    changeType = 'added'
   } else if (hasRename || oldPath !== newPath) {
-    status = 'renamed'
+    changeType = 'renamed'
   }
 
   // Parse hunks
@@ -105,7 +105,7 @@ function parseFileDiff (fileDiff: string): DiffFile | null {
   return {
     oldPath,
     newPath,
-    status,
+    changeType,
     additions,
     deletions,
     hunks,
@@ -202,10 +202,10 @@ export function getDiffSummary (files: DiffFile[]): DiffSummary {
     totalFiles: files.length,
     totalAdditions,
     totalDeletions,
-    filesAdded: files.filter((f) => f.status === 'added').length,
-    filesModified: files.filter((f) => f.status === 'modified').length,
-    filesDeleted: files.filter((f) => f.status === 'deleted').length,
-    filesRenamed: files.filter((f) => f.status === 'renamed').length,
+    filesAdded: files.filter((f) => f.changeType === 'added').length,
+    filesModified: files.filter((f) => f.changeType === 'modified').length,
+    filesDeleted: files.filter((f) => f.changeType === 'deleted').length,
+    filesRenamed: files.filter((f) => f.changeType === 'renamed').length,
   }
 }
 

@@ -16,13 +16,15 @@ export interface Review {
 
 export type ReviewStatus = 'in_progress' | 'approved' | 'changes_requested'
 export type ReviewSourceType = 'staged' | 'branch' | 'commits'
+export type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed'
+export type LineType = 'added' | 'removed' | 'context'
 
 export interface Comment {
   id: string;
   reviewId: string;
   filePath: string;
   lineNumber: number | null; // null for file-level comments
-  lineType: 'added' | 'removed' | 'context' | null;
+  lineType: LineType | null;
   content: string;
   suggestion: string | null;
   /** Whether the reviewer's concern has been addressed (the discussion is settled). */
@@ -45,7 +47,7 @@ export interface Todo {
 export interface DiffFile {
   oldPath: string;
   newPath: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
   hunks: DiffHunk[];
@@ -55,7 +57,7 @@ export interface DiffFile {
 export interface DiffFileMetadata {
   oldPath: string;
   newPath: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
 }
@@ -83,10 +85,12 @@ export interface RepositoryInfo {
 }
 
 // API request/response types
-export interface CreateReviewRequest {
-  sourceType?: ReviewSourceType;
-  sourceRef?: string; // branch name or commit SHAs
-}
+export type ReviewSource =
+  | { sourceType?: 'staged' }
+  | { sourceType: 'branch'; sourceRef: string }
+  | { sourceType: 'commits'; sourceRef: string }
+
+export type CreateReviewRequest = ReviewSource
 
 export interface UpdateReviewRequest {
   status?: ReviewStatus;
@@ -95,7 +99,7 @@ export interface UpdateReviewRequest {
 export interface CreateCommentRequest {
   filePath: string;
   lineNumber?: number;
-  lineType?: 'added' | 'removed' | 'context';
+  lineType?: LineType;
   content: string;
   suggestion?: string;
 }
