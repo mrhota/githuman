@@ -20,6 +20,8 @@ import commentRoutes from './routes/comments.ts'
 import todoRoutes from './routes/todos.ts'
 import gitRoutes from './routes/git.ts'
 import eventsRoutes from './routes/events.ts'
+import { createEventBus } from './adapters/event-bus.ts'
+import type { EventBus } from './ports.ts'
 import type { ServerConfig } from './config.ts'
 import type { HealthResponse } from '../shared/types.ts'
 import { HealthResponseSchema } from './schemas/common.ts'
@@ -187,6 +189,10 @@ export async function buildApp (
   // Register service factories
   await app.register(servicesPlugin)
 
+  // Create and decorate the EventBus
+  const eventBus = createEventBus()
+  app.decorate('eventBus', eventBus)
+
   // Register routes
   await app.register(diffRoutes)
   await app.register(imageRoute)
@@ -223,5 +229,6 @@ export async function buildApp (
 declare module 'fastify' {
   interface FastifyInstance {
     config: ServerConfig;
+    eventBus: EventBus;
   }
 }

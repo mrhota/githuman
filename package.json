@@ -69,7 +69,6 @@
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",
     "ignore": "^7.0.5",
-    "mqemitter": "^7.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
