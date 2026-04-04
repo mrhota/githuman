@@ -16,6 +16,7 @@ export interface Review {
 
 export type ReviewStatus = 'in_progress' | 'approved' | 'changes_requested'
 export type ReviewSourceType = 'staged' | 'branch' | 'commits'
+export type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed'
 
 export interface Comment {
   id: string;
@@ -45,7 +46,7 @@ export interface Todo {
 export interface DiffFile {
   oldPath: string;
   newPath: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
   hunks: DiffHunk[];
@@ -55,7 +56,7 @@ export interface DiffFile {
 export interface DiffFileMetadata {
   oldPath: string;
   newPath: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
 }
