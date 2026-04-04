@@ -70,7 +70,7 @@ export class ExportService {
         return {
           oldPath: rf.oldPath ?? rf.filePath,
           newPath: rf.filePath,
-          status: rf.status,
+          changeType: rf.changeType,
           additions: rf.additions,
           deletions: rf.deletions,
           hunks,
@@ -89,10 +89,10 @@ export class ExportService {
         totalFiles: files.length,
         totalAdditions,
         totalDeletions,
-        filesAdded: files.filter((f) => f.status === 'added').length,
-        filesModified: files.filter((f) => f.status === 'modified').length,
-        filesDeleted: files.filter((f) => f.status === 'deleted').length,
-        filesRenamed: files.filter((f) => f.status === 'renamed').length,
+        filesAdded: files.filter((f) => f.changeType === 'added').length,
+        filesModified: files.filter((f) => f.changeType === 'modified').length,
+        filesDeleted: files.filter((f) => f.changeType === 'deleted').length,
+        filesRenamed: files.filter((f) => f.changeType === 'renamed').length,
       }
     } else {
       // Legacy format: files embedded in snapshot_data
@@ -233,7 +233,7 @@ export class ExportService {
         deleted: '🗑️',
         modified: '📝',
         renamed: '📋',
-      }[file.status]
+      }[file.changeType]
       lines.push(`- ${badge} \`${path}\` (+${file.additions}/-${file.deletions})`)
     }
     lines.push('')

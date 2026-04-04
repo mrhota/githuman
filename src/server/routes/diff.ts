@@ -27,7 +27,7 @@ const UnstagedDiffResponseSchema = Type.Object(
 const StagedFileSchema = Type.Object({
   path: Type.String({ description: 'File path' }),
   oldPath: Type.Optional(Type.String({ description: 'Original path for renames' })),
-  status: Type.Union([
+  changeType: Type.Union([
     Type.Literal('added'),
     Type.Literal('modified'),
     Type.Literal('deleted'),
@@ -248,7 +248,7 @@ const diffRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       return {
         path: file.path,
         oldPath: file.oldPath,
-        status: file.status,
+        changeType: file.status,
         additions: fileStat?.additions ?? 0,
         deletions: fileStat?.deletions ?? 0,
       }

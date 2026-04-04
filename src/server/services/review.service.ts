@@ -16,6 +16,7 @@ import type {
   CreateReviewRequest,
   UpdateReviewRequest,
   PaginatedResponse,
+  FileChangeType,
 } from '../../shared/types.ts'
 import { parseSnapshotData, isV2Snapshot } from './snapshot.ts'
 
@@ -23,7 +24,7 @@ import { parseSnapshotData, isV2Snapshot } from './snapshot.ts'
 export interface DiffFileMetadata {
   oldPath: string;
   newPath: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  changeType: FileChangeType;
   additions: number;
   deletions: number;
 }
@@ -122,7 +123,7 @@ export class ReviewService {
       reviewId,
       filePath: file.newPath,
       oldPath: file.oldPath !== file.newPath ? file.oldPath : null,
-      status: file.status,
+      changeType: file.changeType,
       additions: file.additions,
       deletions: file.deletions,
       hunksData: storeHunks ? ReviewFileRepository.serializeHunks(file.hunks) : null,
@@ -153,7 +154,7 @@ export class ReviewService {
     const fileMetadata: DiffFileMetadata[] = files.map((file) => ({
       oldPath: file.oldPath,
       newPath: file.newPath,
-      status: file.status,
+      changeType: file.changeType,
       additions: file.additions,
       deletions: file.deletions,
     }))
@@ -333,7 +334,7 @@ export class ReviewService {
       fileMetadata = reviewFiles.map((rf) => ({
         oldPath: rf.oldPath ?? rf.filePath,
         newPath: rf.filePath,
-        status: rf.status,
+        changeType: rf.changeType,
         additions: rf.additions,
         deletions: rf.deletions,
       }))
@@ -350,10 +351,10 @@ export class ReviewService {
         totalFiles: fileMetadata.length,
         totalAdditions,
         totalDeletions,
-        filesAdded: fileMetadata.filter((f) => f.status === 'added').length,
-        filesModified: fileMetadata.filter((f) => f.status === 'modified').length,
-        filesDeleted: fileMetadata.filter((f) => f.status === 'deleted').length,
-        filesRenamed: fileMetadata.filter((f) => f.status === 'renamed').length,
+        filesAdded: fileMetadata.filter((f) => f.changeType === 'added').length,
+        filesModified: fileMetadata.filter((f) => f.changeType === 'modified').length,
+        filesDeleted: fileMetadata.filter((f) => f.changeType === 'deleted').length,
+        filesRenamed: fileMetadata.filter((f) => f.changeType === 'renamed').length,
       }
     } else {
       // Legacy format: files embedded in snapshot_data
@@ -361,7 +362,7 @@ export class ReviewService {
       fileMetadata = files.map((file) => ({
         oldPath: file.oldPath,
         newPath: file.newPath,
-        status: file.status,
+        changeType: file.changeType,
         additions: file.additions,
         deletions: file.deletions,
       }))
@@ -403,10 +404,10 @@ export class ReviewService {
         totalFiles: reviewFiles.length,
         totalAdditions,
         totalDeletions,
-        filesAdded: reviewFiles.filter((f) => f.status === 'added').length,
-        filesModified: reviewFiles.filter((f) => f.status === 'modified').length,
-        filesDeleted: reviewFiles.filter((f) => f.status === 'deleted').length,
-        filesRenamed: reviewFiles.filter((f) => f.status === 'renamed').length,
+        filesAdded: reviewFiles.filter((f) => f.changeType === 'added').length,
+        filesModified: reviewFiles.filter((f) => f.changeType === 'modified').length,
+        filesDeleted: reviewFiles.filter((f) => f.changeType === 'deleted').length,
+        filesRenamed: reviewFiles.filter((f) => f.changeType === 'renamed').length,
       }
     } else {
       // Legacy format
