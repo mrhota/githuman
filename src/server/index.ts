@@ -1,7 +1,6 @@
 /**
  * Server entry point
  */
-import closeWithGrace from 'close-with-grace'
 import { networkInterfaces } from 'node:os'
 import { buildApp, type AppOptions } from './app.ts'
 import { initDatabase, closeDatabase } from './db/index.ts'
@@ -50,15 +49,18 @@ export async function startServer (config: ServerConfig, options: StartServerOpt
   }
 
   // Graceful shutdown with timeout
-  closeWithGrace({ delay: 5000 }, async ({ signal, err }) => {
-    if (err) {
-      app.log.error({ err }, 'Server closing due to error')
-    } else {
-      app.log.info({ signal }, 'Server shutting down')
+  const shutdown = async () => {
+    app.log.info('Shutting down...')
+    const timer = setTimeout(() => process.exit(1), 5000)
+    try {
+      await app.close()
+      closeDatabase()
+    } finally {
+      clearTimeout(timer)
     }
-    await app.close()
-    closeDatabase()
-  })
+  }
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
 
   try {
     await app.listen({ port: config.port, host: config.host })

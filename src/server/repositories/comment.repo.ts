@@ -3,6 +3,7 @@
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import type { Comment } from '../../shared/types.ts'
+import { type Clock, systemClock } from '../ports.ts'
 
 interface CommentRow {
   id: string;
@@ -34,6 +35,7 @@ function rowToComment (row: CommentRow): Comment {
 
 export class CommentRepository {
   private db: DatabaseSync
+  private clock: Clock
   private stmtFindById: StatementSync
   private stmtFindByReview: StatementSync
   private stmtFindByFile: StatementSync
@@ -45,8 +47,9 @@ export class CommentRepository {
   private stmtCountByReview: StatementSync
   private stmtCountUnresolvedByReview: StatementSync
 
-  constructor (db: DatabaseSync) {
+  constructor (db: DatabaseSync, clock: Clock = systemClock) {
     this.db = db
+    this.clock = clock
 
     this.stmtFindById = db.prepare(`
       SELECT * FROM comments WHERE id = ?
@@ -117,7 +120,7 @@ export class CommentRepository {
   }
 
   create (comment: Omit<Comment, 'createdAt' | 'updatedAt'>): Comment {
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.stmtInsert.run(
       comment.id,
@@ -144,7 +147,7 @@ export class CommentRepository {
       return null
     }
 
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     // For suggestion, we want to allow setting it to null explicitly
     const suggestionValue =
@@ -166,7 +169,7 @@ export class CommentRepository {
       return null
     }
 
-    const now = new Date().toISOString()
+    const now = this.clock()
     this.stmtSetResolved.run(resolved ? 1 : 0, now, id)
 
     return this.findById(id)

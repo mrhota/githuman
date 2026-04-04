@@ -4,6 +4,7 @@
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import type { DiffHunk } from '../../shared/types.ts'
+import { type Clock, systemClock } from '../ports.ts'
 
 export interface ReviewFile {
   id: string;
@@ -80,14 +81,16 @@ function rowToReviewFileMetadata (row: ReviewFileRow): ReviewFileMetadata {
 
 export class ReviewFileRepository {
   private db: DatabaseSync
+  private clock: Clock
   private stmtFindByReview: StatementSync
   private stmtFindByReviewAndPath: StatementSync
   private stmtInsert: StatementSync
   private stmtDeleteByReview: StatementSync
   private stmtCountByReview: StatementSync
 
-  constructor (db: DatabaseSync) {
+  constructor (db: DatabaseSync, clock: Clock = systemClock) {
     this.db = db
+    this.clock = clock
 
     // Returns metadata only (no hunks_data for performance)
     this.stmtFindByReview = db.prepare(`
@@ -137,7 +140,7 @@ export class ReviewFileRepository {
    * Create a single file record
    */
   create (file: CreateReviewFileInput): ReviewFile {
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.stmtInsert.run(
       file.id,
@@ -160,7 +163,7 @@ export class ReviewFileRepository {
   createBulk (files: CreateReviewFileInput[]): void {
     if (files.length === 0) return
 
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.db.exec('BEGIN TRANSACTION')
     try {

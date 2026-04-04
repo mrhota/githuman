@@ -3,6 +3,7 @@
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import type { Todo } from '../../shared/types.ts'
+import { type Clock, type IdGenerator, systemClock, systemIdGenerator } from '../ports.ts'
 
 interface TodoRow {
   id: string;
@@ -28,6 +29,8 @@ function rowToTodo (row: TodoRow): Todo {
 
 export class TodoRepository {
   private db: DatabaseSync
+  private clock: Clock
+  private idGenerator: IdGenerator
   private stmtFindById: StatementSync
   private stmtFindAll: StatementSync
   private stmtFindByReview: StatementSync
@@ -45,8 +48,10 @@ export class TodoRepository {
   private stmtGetMaxPosition: StatementSync
   private stmtUpdatePosition: StatementSync
 
-  constructor (db: DatabaseSync) {
+  constructor (db: DatabaseSync, clock: Clock = systemClock, idGenerator: IdGenerator = systemIdGenerator) {
     this.db = db
+    this.clock = clock
+    this.idGenerator = idGenerator
 
     this.stmtFindById = db.prepare(`
       SELECT * FROM todos WHERE id = ?
@@ -162,13 +167,14 @@ export class TodoRepository {
     return rows.map(rowToTodo)
   }
 
-  create (todo: Omit<Todo, 'createdAt' | 'updatedAt' | 'position'>): Todo {
-    const now = new Date().toISOString()
+  create (todo: Omit<Todo, 'createdAt' | 'updatedAt' | 'position'> | Omit<Todo, 'id' | 'createdAt' | 'updatedAt' | 'position'>): Todo {
+    const id = 'id' in todo && todo.id ? todo.id : this.idGenerator()
+    const now = this.clock()
     const maxResult = this.stmtGetMaxPosition.get() as { max_position: number | null }
     const nextPosition = (maxResult.max_position ?? -1) + 1
 
     this.stmtInsert.run(
-      todo.id,
+      id,
       todo.content,
       todo.completed ? 1 : 0,
       todo.reviewId,
@@ -177,7 +183,7 @@ export class TodoRepository {
       now
     )
 
-    return this.findById(todo.id)!
+    return this.findById(id)!
   }
 
   update (
@@ -189,7 +195,7 @@ export class TodoRepository {
       return null
     }
 
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.stmtUpdate.run(
       updates.content ?? null,
@@ -207,7 +213,7 @@ export class TodoRepository {
       return null
     }
 
-    const now = new Date().toISOString()
+    const now = this.clock()
     this.stmtToggle.run(now, id)
 
     return this.findById(id)
@@ -249,7 +255,7 @@ export class TodoRepository {
    * @returns The number of todos updated
    */
   reorder (orderedIds: string[]): number {
-    const now = new Date().toISOString()
+    const now = this.clock()
     let updated = 0
 
     for (let i = 0; i < orderedIds.length; i++) {
