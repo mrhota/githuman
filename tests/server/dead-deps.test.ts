@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const DEAD_DEPS = ['zod', 'diff2html'] as const
+const DEAD_DEPS = ['zod', 'diff2html', 'close-with-grace', 'open', 'clsx'] as const
 
 function collectTsFiles (dir: string): string[] {
   const results: string[] = []
