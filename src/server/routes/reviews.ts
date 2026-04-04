@@ -44,11 +44,20 @@ const ReviewWithDetailsSchema = Type.Object(
   { description: 'Review with file metadata (hunks loaded separately)' }
 )
 
-const CreateReviewSchema = Type.Object(
-  {
-    sourceType: Type.Optional(ReviewSourceTypeSchema),
-    sourceRef: Type.Optional(Type.String({ description: 'Branch name or commit SHAs' })),
-  },
+const CreateReviewSchema = Type.Union(
+  [
+    Type.Object({
+      sourceType: Type.Optional(Type.Literal('staged')),
+    }),
+    Type.Object({
+      sourceType: Type.Literal('branch'),
+      sourceRef: Type.String({ description: 'Branch name to compare' }),
+    }),
+    Type.Object({
+      sourceType: Type.Literal('commits'),
+      sourceRef: Type.String({ description: 'Comma-separated commit SHAs' }),
+    }),
+  ],
   { description: 'Create review request' }
 )
 

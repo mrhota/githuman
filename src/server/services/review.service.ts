@@ -75,7 +75,12 @@ export class ReviewService {
     }
 
     const sourceType = request.sourceType || 'staged'
-    const sourceRef = request.sourceRef || null
+    const sourceRef = 'sourceRef' in request ? (request as { sourceRef: string }).sourceRef : null
+
+    // Validate that staged reviews don't have a sourceRef
+    if (sourceType === 'staged' && sourceRef) {
+      throw new ReviewError('Staged reviews do not accept a sourceRef', 'INVALID_SOURCE')
+    }
 
     let diffText: string
     let baseRef: string | null

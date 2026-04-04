@@ -84,10 +84,12 @@ export interface RepositoryInfo {
 }
 
 // API request/response types
-export interface CreateReviewRequest {
-  sourceType?: ReviewSourceType;
-  sourceRef?: string; // branch name or commit SHAs
-}
+export type ReviewSource =
+  | { sourceType?: 'staged' }
+  | { sourceType: 'branch'; sourceRef: string }
+  | { sourceType: 'commits'; sourceRef: string }
+
+export type CreateReviewRequest = ReviewSource
 
 export interface UpdateReviewRequest {
   status?: ReviewStatus;

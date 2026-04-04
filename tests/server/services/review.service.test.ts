@@ -144,6 +144,23 @@ describe('ReviewService', () => {
         }
       )
     })
+
+    it('rejects staged source with sourceRef', async (t) => {
+      const tempDir = createTestRepo(t)
+      const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(tempDir))
+
+      // Stage a file first so we don't hit NO_STAGED_CHANGES error
+      writeFileSync(join(tempDir, 'test.ts'), 'const x = 1;\n')
+      execSync('git add test.ts', { cwd: tempDir, stdio: 'ignore' })
+
+      await assert.rejects(
+        () => service.create({ sourceType: 'staged', sourceRef: 'main' } as any),
+        (err: any) => {
+          assert.strictEqual(err.code, 'INVALID_SOURCE')
+          return true
+        }
+      )
+    })
   })
 
   describe('getById', () => {
