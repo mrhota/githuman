@@ -90,12 +90,32 @@ The server follows a layered architecture:
 
 All business logic belongs in the service layer. Routes should delegate to services, not call repositories directly or contain business logic like UUID generation or default values.
 
+### Ports and Adapters
+
+Side effects are abstracted behind SPI ports defined in `src/server/ports.ts`:
+
+- **`Clock`** (`() => string`) — injected into all repositories for timestamps. Default: `systemClock` (ISO string).
+- **`IdGenerator`** (`() => string`) — injected into services and `TodoRepository` for UUID generation. Default: `systemIdGenerator`.
+- **`EventBus`** — pub/sub interface for SSE broadcasting. Adapter in `src/server/adapters/event-bus.ts` uses Node.js `EventEmitter`.
+
+When adding new infrastructure dependencies, define a port in `ports.ts` and an adapter in `src/server/adapters/` rather than importing the dependency directly in domain code. In tests, inject fakes:
+
+```typescript
+const fakeClock = () => '2025-01-01T00:00:00.000Z'
+const fakeId = () => 'test-id-123'
+const repo = new ReviewRepository(db, fakeClock)
+```
+
 ### Plugins
 
 - `src/server/plugins/auth.ts` - Bearer token authentication (optional, for non-localhost access)
 - `src/server/plugins/services.ts` - Service factory plugin, centralizes construction of services and repositories
 
 The `ServiceFactories` interface on the Fastify instance provides per-request service construction. Routes access services via `fastify.services.review(request.log)`, `fastify.services.comment()`, etc. The `request.log` parameter propagates request-scoped logging to services that shell out to git.
+
+### Dependency Policy
+
+Minimize npm dependencies. Prefer Node.js stdlib or small inline implementations over third-party packages. When evaluating a dependency, the security argument (smaller supply-chain surface) outweighs convenience. If a package is used in 1-2 files with a thin API surface, replace it. Infrastructure dependencies should be behind SPI ports so they can be swapped without touching domain code.
 
 ### Database
 
@@ -136,12 +156,13 @@ React 19 SPA with:
 
 ### Server tests
 
-Server tests use Node.js native test runner with in-memory SQLite. Repositories accept `DatabaseSync` via constructor, making them easy to test:
+Server tests use Node.js native test runner with in-memory SQLite. Repositories accept `DatabaseSync` and an optional `Clock` via constructor; services accept repositories and an optional `IdGenerator`. Inject fakes for deterministic assertions:
 
 ```typescript
 import { createTestDatabase } from '../../src/server/db/index.ts';
 const db = createTestDatabase();
-const repo = new SomeRepository(db);
+const fakeClock = () => '2025-01-01T00:00:00.000Z'
+const repo = new SomeRepository(db, fakeClock);
 ```
 
 Route tests use Fastify's `inject()` for in-process HTTP testing. Always close Fastify apps in an `after()` hook, never inline:
