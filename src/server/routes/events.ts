@@ -1,38 +1,21 @@
 /**
  * Server-Sent Events (SSE) routes for real-time updates
- * Uses @fastify/sse for SSE handling and mqemitter for local event dispatching
+ * Uses EventBus port for local event dispatching
  * Includes file watching for live unstaged diff updates
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import MQEmitter, { type Message, type MQEmitter as MQEmitterType } from 'mqemitter'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { relative } from 'node:path'
 import { SuccessSchema } from '../schemas/common.ts'
 import { loadGitignore } from '../utils/gitignore.ts'
+import type { EventType } from '../ports.ts'
 
-// Event types that can be broadcast
-export type EventType = 'todos' | 'reviews' | 'comments' | 'files'
-
-// Extended message type for our events
-interface EventMessage extends Message {
-  type: EventType;
-  data?: unknown;
-  timestamp: number;
-}
+// Re-export EventType so existing consumers don't break
+export type { EventType } from '../ports.ts'
 
 // Track connected clients for the /clients endpoint and graceful shutdown
 let clientCount = 0
 const activeConnections = new Set<{ close: () => void }>()
-
-/**
- * Broadcast an event to all connected SSE clients via mqemitter
- */
-async function broadcast (emitter: MQEmitterType, eventType: EventType, data?: unknown): Promise<void> {
-  const message = { type: eventType, data, timestamp: Date.now() }
-  return new Promise((resolve) => {
-    emitter.emit({ topic: 'events', ...message }, () => resolve())
-  })
-}
 
 const NotifyBodySchema = Type.Object(
   {
@@ -60,9 +43,7 @@ function debounce<T extends (...args: unknown[]) => void> (fn: T, ms: number): T
 }
 
 const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
-  // Decorate the emitter to the fastify instance
-  const emitter = MQEmitter()
-  fastify.decorate('eventEmitter', emitter)
+  const eventBus = fastify.eventBus
 
   // Set up file watcher for live updates
   let fileWatcher: FSWatcher | null = null
@@ -70,7 +51,7 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
 
   // Debounced broadcast to avoid flooding on rapid file changes
   const broadcastFileChange = debounce(() => {
-    broadcast(emitter, 'files', { action: 'updated' })
+    eventBus.emit('files', { action: 'updated' })
     fastify.log.debug('File change detected, broadcasting event')
   }, 300)
 
@@ -137,8 +118,8 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     }
     activeConnections.clear()
 
-    // Close the event emitter
-    await new Promise<void>((resolve) => emitter.close(resolve))
+    // Close the event bus
+    await eventBus.close()
 
     await stopWatching()
   })
@@ -172,26 +153,24 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       // Send initial connection event
       await reply.sse.send({ data: { type: 'connected', timestamp: Date.now() } })
 
-      // Subscribe to events from mqemitter
-      const listener = (message: Message, cb: () => void) => {
+      // Subscribe to events from EventBus
+      const listener = (type: EventType, data?: unknown) => {
         try {
-          const eventMessage = message as EventMessage
           if (reply.sse.isConnected) {
-            reply.sse.send({ data: { type: eventMessage.type, data: eventMessage.data, timestamp: eventMessage.timestamp } })
+            reply.sse.send({ data: { type, data, timestamp: Date.now() } })
           }
         } catch (err) {
           request.log.error({ err }, 'Error sending SSE event')
         }
-        cb()
       }
 
-      fastify.eventEmitter.on('events', listener)
+      eventBus.on(listener)
 
       // Clean up on disconnect
       reply.sse.onClose(() => {
         clientCount--
         activeConnections.delete(connection)
-        fastify.eventEmitter.removeListener('events', listener)
+        eventBus.removeListener(listener)
         request.log.info({ clients: clientCount }, 'SSE client disconnected')
       })
     }
@@ -217,7 +196,7 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
     async (request) => {
       const { type, action } = request.body
-      await broadcast(fastify.eventEmitter, type, { action })
+      await eventBus.emit(type, { action })
       request.log.info({ type, action, clients: clientCount }, 'Event broadcast')
       return { success: true }
     }
@@ -248,10 +227,3 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
 }
 
 export default eventsRoutes
-
-// Extend Fastify types for the eventEmitter decorator
-declare module 'fastify' {
-  interface FastifyInstance {
-    eventEmitter: MQEmitterType;
-  }
-}
