@@ -3,6 +3,7 @@
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import type { Review, ReviewStatus, ReviewSourceType } from '../../shared/types.ts'
+import { type Clock, systemClock } from '../ports.ts'
 
 interface ReviewRow {
   id: string;
@@ -32,6 +33,7 @@ function rowToReview (row: ReviewRow): Review {
 
 export class ReviewRepository {
   private db: DatabaseSync
+  private clock: Clock
   private stmtFindById: StatementSync
   private stmtInsert: StatementSync
   private stmtUpdateStatus: StatementSync
@@ -41,8 +43,9 @@ export class ReviewRepository {
   private stmtCountByRepo: StatementSync
   private stmtFindLastId: StatementSync
 
-  constructor (db: DatabaseSync) {
+  constructor (db: DatabaseSync, clock: Clock = systemClock) {
     this.db = db
+    this.clock = clock
 
     // Prepare statements for better performance
     this.stmtFindById = db.prepare(`
@@ -138,7 +141,7 @@ export class ReviewRepository {
   }
 
   create (review: Omit<Review, 'createdAt' | 'updatedAt'>): Review {
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.stmtInsert.run(
       review.id,
@@ -163,7 +166,7 @@ export class ReviewRepository {
       return null
     }
 
-    const now = new Date().toISOString()
+    const now = this.clock()
 
     this.stmtUpdateStatus.run(
       updates.status ?? null,

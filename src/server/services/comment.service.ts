@@ -1,9 +1,9 @@
 /**
  * Comment service - business logic for comment management
  */
-import { randomUUID } from 'node:crypto'
 import { CommentRepository } from '../repositories/comment.repo.ts'
 import { ReviewRepository } from '../repositories/review.repo.ts'
+import { type IdGenerator, systemIdGenerator } from '../ports.ts'
 import type {
   Comment,
   CreateCommentRequest,
@@ -24,10 +24,12 @@ export interface CommentsGroupedByFile {
 export class CommentService {
   private repo: CommentRepository
   private reviewRepo: ReviewRepository
+  private idGenerator: IdGenerator
 
-  constructor (commentRepo: CommentRepository, reviewRepo: ReviewRepository) {
+  constructor (commentRepo: CommentRepository, reviewRepo: ReviewRepository, idGenerator: IdGenerator = systemIdGenerator) {
     this.repo = commentRepo
     this.reviewRepo = reviewRepo
+    this.idGenerator = idGenerator
   }
 
   /**
@@ -49,7 +51,7 @@ export class CommentService {
     }
 
     return this.repo.create({
-      id: randomUUID(),
+      id: this.idGenerator(),
       reviewId,
       filePath: request.filePath,
       lineNumber: request.lineNumber ?? null,
