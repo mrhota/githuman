@@ -6,6 +6,7 @@ import { writeFileSync } from 'node:fs'
 import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ExportService } from '../../server/services/export.service.ts'
+import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 
 function printHelp () {
   console.log(`
@@ -22,12 +23,6 @@ Options:
   --no-snippets          Exclude diff snippets
   -h, --help             Show this help message
 `)
-}
-
-function getLastReviewId (db: ReturnType<typeof getDatabase>): string | null {
-  const stmt = db.prepare('SELECT id FROM reviews ORDER BY created_at DESC LIMIT 1')
-  const row = stmt.get() as { id: string } | undefined
-  return row?.id ?? null
 }
 
 export async function exportCommand (args: string[]) {
@@ -63,7 +58,8 @@ export async function exportCommand (args: string[]) {
 
     // Handle "last" keyword
     if (reviewId === 'last') {
-      const lastId = getLastReviewId(db)
+      const reviewRepo = new ReviewRepository(db)
+      const lastId = reviewRepo.findLastId()
       if (!lastId) {
         console.error('Error: No reviews found')
         process.exit(1)

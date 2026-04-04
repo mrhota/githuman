@@ -4,6 +4,7 @@
 import { parseArgs } from 'node:util'
 import { initDatabase, closeDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
+import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import type { ReviewStatus } from '../../shared/types.ts'
 
 function printHelp () {
@@ -38,33 +39,30 @@ export async function listCommand (args: string[]) {
 
   try {
     const db = initDatabase(config.dbPath)
+    const reviewRepo = new ReviewRepository(db)
 
-    let query = 'SELECT id, source_type, source_ref, status, created_at, updated_at FROM reviews'
-    const params: string[] = []
+    const result = reviewRepo.findAll({
+      status: values.status as ReviewStatus | undefined,
+      pageSize: 1000,
+    })
 
-    if (values.status) {
-      query += ' WHERE status = ?'
-      params.push(values.status as ReviewStatus)
-    }
-
-    query += ' ORDER BY created_at DESC'
-
-    const stmt = db.prepare(query)
-    const reviews = params.length > 0 ? stmt.all(params[0]) : stmt.all()
+    const reviews = result.data
 
     if (values.json) {
-      console.log(JSON.stringify(reviews, null, 2))
+      // Output the same shape as before for backwards compatibility
+      console.log(JSON.stringify(reviews.map((r) => ({
+        id: r.id,
+        source_type: r.sourceType,
+        source_ref: r.sourceRef,
+        status: r.status,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt,
+      })), null, 2))
     } else if (reviews.length === 0) {
       console.log('No reviews found.')
     } else {
       console.log('Reviews:\n')
-      for (const review of reviews as Array<{
-        id: string;
-        source_type: string;
-        source_ref: string | null;
-        status: string;
-        created_at: string;
-      }>) {
+      for (const review of reviews) {
         const statusIcon =
           review.status === 'approved'
             ? '[+]'
@@ -73,19 +71,19 @@ export async function listCommand (args: string[]) {
               : '[ ]'
 
         // Build a display name based on source type
-        let displayName = review.source_type
-        if (review.source_type === 'branch' && review.source_ref) {
-          displayName = `Branch: ${review.source_ref}`
-        } else if (review.source_type === 'commits' && review.source_ref) {
-          const commits = review.source_ref.split(',')
+        let displayName: string = review.sourceType
+        if (review.sourceType === 'branch' && review.sourceRef) {
+          displayName = `Branch: ${review.sourceRef}`
+        } else if (review.sourceType === 'commits' && review.sourceRef) {
+          const commits = review.sourceRef.split(',')
           displayName = `Commits: ${commits.length} commit${commits.length > 1 ? 's' : ''}`
-        } else if (review.source_type === 'staged') {
+        } else if (review.sourceType === 'staged') {
           displayName = 'Staged changes'
         }
 
         console.log(`${statusIcon} ${displayName}`)
         console.log(`    ID: ${review.id}`)
-        console.log(`    Created: ${review.created_at}\n`)
+        console.log(`    Created: ${review.createdAt}\n`)
       }
     }
 
