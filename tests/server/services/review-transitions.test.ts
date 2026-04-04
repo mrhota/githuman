@@ -3,6 +3,8 @@ import assert from 'node:assert'
 import { randomUUID } from 'node:crypto'
 import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
+import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
+import { GitService } from '../../../src/server/services/git.service.ts'
 import type { ReviewStatus } from '../../../src/shared/types.ts'
 
 /**
@@ -40,9 +42,14 @@ describe('review status transitions', () => {
   async function getService () {
     const db = createTestDatabase()
     const { ReviewService } = await import('../../../src/server/services/review.service.ts')
-    // ReviewService constructor requires a real git dir for GitService;
-    // we only test update() which doesn't use git, so pass cwd.
-    return { service: new ReviewService(db, process.cwd()), db }
+    return {
+      service: new ReviewService(
+        new ReviewRepository(db),
+        new ReviewFileRepository(db),
+        new GitService(process.cwd()),
+      ),
+      db,
+    }
   }
 
   describe('valid transitions', () => {

@@ -5,8 +5,10 @@ import { parseArgs } from 'node:util'
 import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
+import { ReviewFileRepository } from '../../server/repositories/review-file.repo.ts'
 import { CommentRepository } from '../../server/repositories/comment.repo.ts'
 import { ReviewService, ReviewError } from '../../server/services/review.service.ts'
+import { GitService } from '../../server/services/git.service.ts'
 
 function printHelp () {
   console.log(`
@@ -60,8 +62,10 @@ export async function resolveCommand (args: string[]) {
     initDatabase(config.dbPath)
     const db = getDatabase()
     const reviewRepo = new ReviewRepository(db)
+    const fileRepo = new ReviewFileRepository(db)
     const commentRepo = new CommentRepository(db)
-    const reviewService = new ReviewService(db, process.cwd())
+    const git = new GitService(process.cwd())
+    const reviewService = new ReviewService(reviewRepo, fileRepo, git)
 
     // Handle "last" keyword
     if (reviewId === 'last') {

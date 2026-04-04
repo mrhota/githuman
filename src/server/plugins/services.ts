@@ -8,6 +8,9 @@ import { ReviewService } from '../services/review.service.ts'
 import { CommentService } from '../services/comment.service.ts'
 import { ExportService } from '../services/export.service.ts'
 import { GitService, type GitServiceLogger } from '../services/git.service.ts'
+import { ReviewRepository } from '../repositories/review.repo.ts'
+import { ReviewFileRepository } from '../repositories/review-file.repo.ts'
+import { CommentRepository } from '../repositories/comment.repo.ts'
 import { TodoRepository } from '../repositories/todo.repo.ts'
 
 export interface ServiceFactories {
@@ -20,9 +23,29 @@ export interface ServiceFactories {
 
 const servicesPlugin: FastifyPluginAsync = async (fastify) => {
   const services: ServiceFactories = {
-    review: (log?) => new ReviewService(getDatabase(), fastify.config.repositoryPath, log),
-    comment: () => new CommentService(getDatabase()),
-    export: () => new ExportService(getDatabase()),
+    review: (log?) => {
+      const db = getDatabase()
+      return new ReviewService(
+        new ReviewRepository(db),
+        new ReviewFileRepository(db),
+        new GitService(fastify.config.repositoryPath, log),
+      )
+    },
+    comment: () => {
+      const db = getDatabase()
+      return new CommentService(
+        new CommentRepository(db),
+        new ReviewRepository(db),
+      )
+    },
+    export: () => {
+      const db = getDatabase()
+      return new ExportService(
+        new ReviewRepository(db),
+        new ReviewFileRepository(db),
+        new CommentRepository(db),
+      )
+    },
     git: (log?) => new GitService(fastify.config.repositoryPath, log),
     todoRepo: () => new TodoRepository(getDatabase()),
   }

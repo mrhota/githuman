@@ -2,7 +2,6 @@
  * Comment service - business logic for comment management
  */
 import { randomUUID } from 'node:crypto'
-import type { DatabaseSync } from 'node:sqlite'
 import { CommentRepository } from '../repositories/comment.repo.ts'
 import { ReviewRepository } from '../repositories/review.repo.ts'
 import type {
@@ -26,9 +25,9 @@ export class CommentService {
   private repo: CommentRepository
   private reviewRepo: ReviewRepository
 
-  constructor (db: DatabaseSync) {
-    this.repo = new CommentRepository(db)
-    this.reviewRepo = new ReviewRepository(db)
+  constructor (commentRepo: CommentRepository, reviewRepo: ReviewRepository) {
+    this.repo = commentRepo
+    this.reviewRepo = reviewRepo
   }
 
   /**
