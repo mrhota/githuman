@@ -3,9 +3,18 @@
  */
 import { parseArgs } from 'node:util'
 import { readFileSync } from 'node:fs'
-import open from 'open'
+import { exec } from 'node:child_process'
 import { startServer, createConfig, generateToken } from '../../server/index.ts'
 import { loadOrCreateCertificates, getCertificatePaths } from '../../server/tls/certificates.ts'
+
+function openInBrowser (url: string): void {
+  const cmd = process.platform === 'darwin'
+    ? 'open'
+    : process.platform === 'win32'
+      ? 'start'
+      : 'xdg-open'
+  exec(`${cmd} ${url}`)
+}
 
 function printHelp () {
   console.log(`
@@ -171,6 +180,6 @@ export async function serveCommand (args: string[]) {
   if (values.open) {
     const protocol = config.https ? 'https' : 'http'
     const url = `${protocol}://${config.host}:${config.port}`
-    await open(url)
+    openInBrowser(url)
   }
 }
