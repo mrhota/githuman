@@ -29,7 +29,7 @@ describe('ExportService', () => {
         {
           oldPath: 'src/index.ts',
           newPath: 'src/index.ts',
-          status: 'modified',
+          changeType: 'modified',
           additions: 5,
           deletions: 2,
           hunks: [
@@ -250,7 +250,7 @@ describe('ExportService', () => {
           {
             oldPath: 'src/feature.ts',
             newPath: 'src/feature.ts',
-            status: 'added',
+            changeType: 'added',
             additions: 10,
             deletions: 0,
             hunks: [],

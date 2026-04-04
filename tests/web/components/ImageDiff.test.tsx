@@ -50,10 +50,10 @@ describe('isImageFile', () => {
 })
 
 describe('ImageDiff', () => {
-  const createMockFile = (status: DiffFile['status']): DiffFile => ({
+  const createMockFile = (changeType: DiffFile['changeType']): DiffFile => ({
     oldPath: 'image.png',
     newPath: 'image.png',
-    status,
+    changeType,
     additions: 0,
     deletions: 0,
     hunks: [],
@@ -111,7 +111,7 @@ describe('ImageDiff', () => {
     const file: DiffFile = {
       oldPath: 'old-image.png',
       newPath: 'new-image.png',
-      status: 'modified',
+      changeType: 'modified',
       additions: 0,
       deletions: 0,
       hunks: [],
@@ -148,7 +148,7 @@ describe('ImageDiff', () => {
     const renamedFile: DiffFile = {
       oldPath: 'old-name.png',
       newPath: 'new-name.png',
-      status: 'renamed',
+      changeType: 'renamed',
       additions: 0,
       deletions: 0,
       hunks: [],

@@ -64,7 +64,7 @@ describe('MarkdownDiff', () => {
   const mockFile: DiffFile = {
     oldPath: 'README.md',
     newPath: 'README.md',
-    status: 'modified',
+    changeType: 'modified',
     additions: 5,
     deletions: 2,
     hunks: [
@@ -159,7 +159,7 @@ describe('MarkdownDiff', () => {
   it('should not show preview/split for deleted files', () => {
     const deletedFile: DiffFile = {
       ...mockFile,
-      status: 'deleted',
+      changeType: 'deleted',
     }
 
     renderWithProvider(<MarkdownDiff file={deletedFile} />)

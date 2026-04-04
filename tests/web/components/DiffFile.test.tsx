@@ -16,7 +16,7 @@ describe('DiffFile', () => {
   const mockFile: DiffFileType = {
     oldPath: 'src/app.ts',
     newPath: 'src/app.ts',
-    status: 'modified',
+    changeType: 'modified',
     additions: 5,
     deletions: 2,
     hunks: [
@@ -41,7 +41,7 @@ describe('DiffFile', () => {
     expect(screen.getByText('src/app.ts')).toBeDefined()
   })
 
-  it('renders status badge', () => {
+  it('renders changeType badge', () => {
     renderWithProvider(<DiffFile file={mockFile} />)
 
     expect(screen.getByText('Modified')).toBeDefined()
@@ -90,7 +90,7 @@ describe('DiffFile', () => {
     const renamedFile: DiffFileType = {
       oldPath: 'old-name.ts',
       newPath: 'new-name.ts',
-      status: 'renamed',
+      changeType: 'renamed',
       additions: 0,
       deletions: 0,
       hunks: [],
@@ -106,7 +106,7 @@ describe('DiffFile', () => {
     const renamedFile: DiffFileType = {
       oldPath: 'old.ts',
       newPath: 'new.ts',
-      status: 'renamed',
+      changeType: 'renamed',
       additions: 0,
       deletions: 0,
       hunks: [],
@@ -121,7 +121,7 @@ describe('DiffFile', () => {
     const addedFile: DiffFileType = {
       oldPath: 'new-file.ts',
       newPath: 'new-file.ts',
-      status: 'added',
+      changeType: 'added',
       additions: 10,
       deletions: 0,
       hunks: [],
@@ -136,7 +136,7 @@ describe('DiffFile', () => {
     const deletedFile: DiffFileType = {
       oldPath: 'old-file.ts',
       newPath: 'old-file.ts',
-      status: 'deleted',
+      changeType: 'deleted',
       additions: 0,
       deletions: 15,
       hunks: [],

@@ -31,7 +31,7 @@ index 1234567..abcdefg 100644
       assert.strictEqual(result.length, 1)
       assert.strictEqual(result[0].oldPath, 'file.txt')
       assert.strictEqual(result[0].newPath, 'file.txt')
-      assert.strictEqual(result[0].status, 'modified')
+      assert.strictEqual(result[0].changeType, 'modified')
       assert.strictEqual(result[0].additions, 2)
       assert.strictEqual(result[0].deletions, 1)
       assert.strictEqual(result[0].hunks.length, 1)
@@ -51,7 +51,7 @@ index 0000000..1234567
       const result = parseDiff(diff)
 
       assert.strictEqual(result.length, 1)
-      assert.strictEqual(result[0].status, 'added')
+      assert.strictEqual(result[0].changeType, 'added')
       assert.strictEqual(result[0].additions, 3)
       assert.strictEqual(result[0].deletions, 0)
     })
@@ -69,7 +69,7 @@ index 1234567..0000000
       const result = parseDiff(diff)
 
       assert.strictEqual(result.length, 1)
-      assert.strictEqual(result[0].status, 'deleted')
+      assert.strictEqual(result[0].changeType, 'deleted')
       assert.strictEqual(result[0].additions, 0)
       assert.strictEqual(result[0].deletions, 2)
     })
@@ -85,7 +85,7 @@ rename to new-name.txt`
       assert.strictEqual(result.length, 1)
       assert.strictEqual(result[0].oldPath, 'old-name.txt')
       assert.strictEqual(result[0].newPath, 'new-name.txt')
-      assert.strictEqual(result[0].status, 'renamed')
+      assert.strictEqual(result[0].changeType, 'renamed')
     })
 
     it('should parse multiple files diff', () => {
@@ -108,9 +108,9 @@ index 0000000..1234567
 
       assert.strictEqual(result.length, 2)
       assert.strictEqual(result[0].newPath, 'file1.txt')
-      assert.strictEqual(result[0].status, 'modified')
+      assert.strictEqual(result[0].changeType, 'modified')
       assert.strictEqual(result[1].newPath, 'file2.txt')
-      assert.strictEqual(result[1].status, 'added')
+      assert.strictEqual(result[1].changeType, 'added')
     })
 
     it('should correctly track line numbers', () => {
@@ -184,9 +184,9 @@ index 1234567..abcdefg 100644
 
     it('should calculate correct totals', () => {
       const files = [
-        { oldPath: 'a.txt', newPath: 'a.txt', status: 'modified' as const, additions: 5, deletions: 2, hunks: [] },
-        { oldPath: 'b.txt', newPath: 'b.txt', status: 'added' as const, additions: 10, deletions: 0, hunks: [] },
-        { oldPath: 'c.txt', newPath: 'c.txt', status: 'deleted' as const, additions: 0, deletions: 8, hunks: [] },
+        { oldPath: 'a.txt', newPath: 'a.txt', changeType: 'modified' as const, additions: 5, deletions: 2, hunks: [] },
+        { oldPath: 'b.txt', newPath: 'b.txt', changeType: 'added' as const, additions: 10, deletions: 0, hunks: [] },
+        { oldPath: 'c.txt', newPath: 'c.txt', changeType: 'deleted' as const, additions: 0, deletions: 8, hunks: [] },
       ]
 
       const summary = getDiffSummary(files)

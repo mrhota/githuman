@@ -64,7 +64,7 @@ describe('ReviewService', () => {
       assert.strictEqual(review.sourceType, 'staged')
       assert.strictEqual(review.files.length, 1)
       assert.strictEqual(review.files[0].newPath, 'test.ts')
-      assert.strictEqual(review.files[0].status, 'added')
+      assert.strictEqual(review.files[0].changeType, 'added')
 
       // Verify files are stored in review_files table
       const files = fileRepo.findByReview(review.id)
@@ -164,7 +164,7 @@ describe('ReviewService', () => {
       // Files should have metadata only, not hunks
       const file = review.files[0]
       assert.ok('newPath' in file)
-      assert.ok('status' in file)
+      assert.ok('changeType' in file)
       assert.ok('additions' in file)
       assert.ok('deletions' in file)
       // hunks should NOT be in the file metadata
