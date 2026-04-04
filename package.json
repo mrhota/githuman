@@ -68,7 +68,6 @@
     "chokidar": "^5.0.0",
     "close-with-grace": "^2.4.0",
     "clsx": "^2.1.1",
-    "diff": "^5.2.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",
     "ignore": "^7.0.5",
@@ -84,8 +83,7 @@
     "selfsigned": "^5.5.0",
     "shiki": "^1.0.0",
     "simple-git": "^3.25.0",
-    "tailwind-merge": "^3.4.0",
-    "uuid": "^10.0.0"
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@fastify/pre-commit": "^2.2.1",
@@ -94,12 +92,10 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
-    "@types/diff": "^5.2.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/selfsigned": "^2.0.4",
-    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.0.16",
     "autoprefixer": "^10.4.23",
