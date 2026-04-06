@@ -5,12 +5,11 @@ import { ReviewRepository } from '../repositories/review.repo.ts'
 import { type IdGenerator, systemIdGenerator } from '../ports.ts'
 import { ReviewFileRepository, type CreateReviewFileInput } from '../repositories/review-file.repo.ts'
 import { GitService } from './git.service.ts'
-import { parseDiff, parseSingleFileDiff, getDiffSummary, type DiffSummary } from './diff.service.ts'
+import { parseDiff, getDiffSummary, type DiffSummary } from './diff.service.ts'
 import type {
   Review,
   ReviewStatus,
   ReviewSourceType,
-  DiffFile,
   DiffHunk,
   RepositoryInfo,
   CreateReviewRequest,
@@ -18,7 +17,11 @@ import type {
   PaginatedResponse,
   FileChangeType,
 } from '../../shared/types.ts'
-import { parseSnapshotData, isV2Snapshot } from './snapshot.ts'
+import {
+  toReviewWithDetails as toReviewWithDetailsShaper,
+  toReviewListItem as toReviewListItemShaper,
+} from './review-shaping.ts'
+import { HunkResolver } from './hunk-resolver.ts'
 
 /** File metadata without hunks (for lazy loading) */
 export interface DiffFileMetadata {
@@ -50,12 +53,20 @@ export class ReviewService {
   private fileRepo: ReviewFileRepository
   private git: GitService
   private idGenerator: IdGenerator
+  private hunkResolver: HunkResolver
 
-  constructor (reviewRepo: ReviewRepository, fileRepo: ReviewFileRepository, git: GitService, idGenerator: IdGenerator = systemIdGenerator) {
+  constructor (
+    reviewRepo: ReviewRepository,
+    fileRepo: ReviewFileRepository,
+    git: GitService,
+    idGenerator: IdGenerator = systemIdGenerator,
+    hunkResolver?: HunkResolver
+  ) {
     this.repo = reviewRepo
     this.fileRepo = fileRepo
     this.git = git
     this.idGenerator = idGenerator
+    this.hunkResolver = hunkResolver ?? new HunkResolver(fileRepo, git)
   }
 
   /**
@@ -207,38 +218,7 @@ export class ReviewService {
       throw new ReviewError('Review not found', 'NOT_FOUND')
     }
 
-    // Try to get from review_files table first (new format)
-    const fileRecord = this.fileRepo.findByReviewAndPath(reviewId, filePath)
-    if (fileRecord && fileRecord.hunksData) {
-      return ReviewFileRepository.parseHunks(fileRecord.hunksData)
-    }
-
-    // For committed reviews (branch/commits) or legacy reviews without stored hunks,
-    // regenerate from git
-    if (review.sourceType === 'branch' && review.sourceRef) {
-      const diffText = await this.git.getBranchFileDiff(review.sourceRef, filePath)
-      const file = parseSingleFileDiff(diffText)
-      return file?.hunks ?? []
-    }
-
-    if (review.sourceType === 'commits' && review.sourceRef) {
-      const commits = review.sourceRef.split(',').map(s => s.trim())
-      const diffText = await this.git.getCommitsFileDiff(commits, filePath)
-      const file = parseSingleFileDiff(diffText)
-      return file?.hunks ?? []
-    }
-
-    // For staged reviews without stored hunks (legacy), try to get from snapshot
-    const snapshot = parseSnapshotData(review.snapshotData)
-    if (!isV2Snapshot(snapshot)) {
-      const legacyFile = snapshot.files.find((f: DiffFile) => f.newPath === filePath)
-      if (legacyFile) {
-        return legacyFile.hunks
-      }
-    }
-
-    // Staged review but changes are no longer staged - hunks unavailable
-    return []
+    return this.hunkResolver.resolve(review, filePath)
   }
 
   /**
@@ -327,109 +307,29 @@ export class ReviewService {
     }
   }
 
+  /**
+   * Get file metadata for V2 snapshots from review_files table.
+   * Returns empty array for non-existent reviews (will be used by V1 path).
+   */
+  private getV2FileMetadata (reviewId: string): DiffFileMetadata[] {
+    const reviewFiles = this.fileRepo.findByReview(reviewId)
+    return reviewFiles.map((rf) => ({
+      oldPath: rf.oldPath ?? rf.filePath,
+      newPath: rf.filePath,
+      changeType: rf.changeType,
+      additions: rf.additions,
+      deletions: rf.deletions,
+    }))
+  }
+
   private toReviewWithDetails (review: Review): ReviewWithDetails {
-    const snapshot = parseSnapshotData(review.snapshotData)
-
-    let fileMetadata: DiffFileMetadata[]
-    let summary: DiffSummary
-
-    if (isV2Snapshot(snapshot)) {
-      // New format: get files from review_files table
-      const reviewFiles = this.fileRepo.findByReview(review.id)
-      fileMetadata = reviewFiles.map((rf) => ({
-        oldPath: rf.oldPath ?? rf.filePath,
-        newPath: rf.filePath,
-        changeType: rf.changeType,
-        additions: rf.additions,
-        deletions: rf.deletions,
-      }))
-
-      // Calculate summary from file metadata
-      let totalAdditions = 0
-      let totalDeletions = 0
-      for (const file of fileMetadata) {
-        totalAdditions += file.additions
-        totalDeletions += file.deletions
-      }
-
-      summary = {
-        totalFiles: fileMetadata.length,
-        totalAdditions,
-        totalDeletions,
-        filesAdded: fileMetadata.filter((f) => f.changeType === 'added').length,
-        filesModified: fileMetadata.filter((f) => f.changeType === 'modified').length,
-        filesDeleted: fileMetadata.filter((f) => f.changeType === 'deleted').length,
-        filesRenamed: fileMetadata.filter((f) => f.changeType === 'renamed').length,
-      }
-    } else {
-      // Legacy format: files embedded in snapshot_data
-      const files = snapshot.files
-      fileMetadata = files.map((file) => ({
-        oldPath: file.oldPath,
-        newPath: file.newPath,
-        changeType: file.changeType,
-        additions: file.additions,
-        deletions: file.deletions,
-      }))
-      summary = getDiffSummary(files)
-    }
-
-    return {
-      id: review.id,
-      repositoryPath: review.repositoryPath,
-      baseRef: review.baseRef,
-      sourceType: review.sourceType,
-      sourceRef: review.sourceRef,
-      status: review.status,
-      createdAt: review.createdAt,
-      updatedAt: review.updatedAt,
-      files: fileMetadata,
-      summary,
-      repository: snapshot.repository,
-    }
+    const v2FileMetadata = this.getV2FileMetadata(review.id)
+    return toReviewWithDetailsShaper(review, v2FileMetadata)
   }
 
   private toReviewListItem (review: Review): ReviewListItem {
-    const snapshot = parseSnapshotData(review.snapshotData)
-
-    let summary: DiffSummary
-
-    if (isV2Snapshot(snapshot)) {
-      // New format: get files from review_files table
-      const reviewFiles = this.fileRepo.findByReview(review.id)
-
-      let totalAdditions = 0
-      let totalDeletions = 0
-      for (const file of reviewFiles) {
-        totalAdditions += file.additions
-        totalDeletions += file.deletions
-      }
-
-      summary = {
-        totalFiles: reviewFiles.length,
-        totalAdditions,
-        totalDeletions,
-        filesAdded: reviewFiles.filter((f) => f.changeType === 'added').length,
-        filesModified: reviewFiles.filter((f) => f.changeType === 'modified').length,
-        filesDeleted: reviewFiles.filter((f) => f.changeType === 'deleted').length,
-        filesRenamed: reviewFiles.filter((f) => f.changeType === 'renamed').length,
-      }
-    } else {
-      // Legacy format
-      summary = getDiffSummary(snapshot.files)
-    }
-
-    return {
-      id: review.id,
-      repositoryPath: review.repositoryPath,
-      baseRef: review.baseRef,
-      sourceType: review.sourceType,
-      sourceRef: review.sourceRef,
-      status: review.status,
-      createdAt: review.createdAt,
-      updatedAt: review.updatedAt,
-      summary,
-    }
+    const v2FileMetadata = this.getV2FileMetadata(review.id)
+    return toReviewListItemShaper(review, v2FileMetadata)
   }
 }
 
