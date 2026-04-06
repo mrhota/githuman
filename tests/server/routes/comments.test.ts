@@ -156,6 +156,41 @@ describe('comment routes', () => {
       assert.strictEqual(data.suggestion, 'const x = 1;')
     })
 
+    it('should reject lineNumber without lineType via schema validation', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/reviews/${testReviewId}/comments`,
+        headers: authHeader(),
+        payload: {
+          filePath: 'src/index.ts',
+          lineNumber: 10,
+          content: 'Missing lineType',
+        },
+      })
+
+      assert.strictEqual(response.statusCode, 400)
+      const data = JSON.parse(response.payload)
+      // Should be a schema validation error (FST_ERR_VALIDATION), not a service-level MISSING_LINE_TYPE
+      assert.notStrictEqual(data.code, 'MISSING_LINE_TYPE')
+    })
+
+    it('should reject lineType without lineNumber via schema validation', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/reviews/${testReviewId}/comments`,
+        headers: authHeader(),
+        payload: {
+          filePath: 'src/index.ts',
+          lineType: 'added',
+          content: 'Missing lineNumber',
+        },
+      })
+
+      assert.strictEqual(response.statusCode, 400)
+      const data = JSON.parse(response.payload)
+      assert.notStrictEqual(data.code, 'MISSING_LINE_TYPE')
+    })
+
     it('should return 404 for non-existent review', async () => {
       const response = await app.inject({
         method: 'POST',

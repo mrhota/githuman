@@ -55,10 +55,13 @@ export function DiffLine ({ line, filePath, showLineNumbers = true, allowComment
   }
 
   const handleSubmitComment = async (content: string, suggestion?: string) => {
+    const lineNumber = line.newLineNumber ?? line.oldLineNumber ?? undefined
+    const location = lineNumber != null
+      ? { lineNumber, lineType: line.type } as const
+      : {}
     await commentContext.addComment({
       filePath,
-      lineNumber: line.newLineNumber ?? line.oldLineNumber ?? undefined,
-      lineType: line.type,
+      ...location,
       content,
       suggestion,
     })

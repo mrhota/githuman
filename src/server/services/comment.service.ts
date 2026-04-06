@@ -42,14 +42,6 @@ export class CommentService {
       throw new CommentError('Review not found', 'REVIEW_NOT_FOUND')
     }
 
-    // Validate line type if line number is provided
-    if (request.lineNumber !== undefined && !request.lineType) {
-      throw new CommentError(
-        'Line type is required when line number is specified',
-        'MISSING_LINE_TYPE'
-      )
-    }
-
     return this.repo.create({
       id: this.idGenerator(),
       reviewId,

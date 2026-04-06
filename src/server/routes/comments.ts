@@ -3,6 +3,7 @@
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { CommentError } from '../services/comment.service.ts'
+import type { CreateCommentRequest } from '../../shared/types.ts'
 import { ErrorSchema, SuccessSchema } from '../schemas/common.ts'
 import { LineTypeSchema } from '../schemas/diff.ts'
 
@@ -38,7 +39,13 @@ const CreateCommentSchema = Type.Object(
     content: Type.String({ minLength: 1, description: 'Comment content' }),
     suggestion: Type.Optional(Type.String({ description: 'Code suggestion' })),
   },
-  { description: 'Create comment request' }
+  {
+    description: 'Create comment request',
+    dependencies: {
+      lineNumber: ['lineType'],
+      lineType: ['lineNumber'],
+    },
+  }
 )
 
 const UpdateCommentSchema = Type.Object(
@@ -139,7 +146,7 @@ const commentRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     const service = fastify.services.comment()
 
     try {
-      const comment = service.create(request.params.reviewId, request.body)
+      const comment = service.create(request.params.reviewId, request.body as CreateCommentRequest)
       reply.code(201)
       return comment
     } catch (err) {
