@@ -96,13 +96,15 @@ export interface UpdateReviewRequest {
   status?: ReviewStatus;
 }
 
-export interface CreateCommentRequest {
+export type CommentLocation =
+  | { lineNumber: number; lineType: LineType }
+  | { lineNumber?: undefined; lineType?: undefined }
+
+export type CreateCommentRequest = {
   filePath: string;
-  lineNumber?: number;
-  lineType?: LineType;
   content: string;
   suggestion?: string;
-}
+} & CommentLocation
 
 export interface UpdateCommentRequest {
   content?: string;

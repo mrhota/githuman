@@ -72,20 +72,8 @@ describe('CommentService', () => {
       assert.strictEqual(comment.suggestion, null)
     })
 
-    it('should throw MISSING_LINE_TYPE when lineNumber provided without lineType', () => {
-      assert.throws(
-        () => service.create(reviewId, {
-          filePath: 'src/index.ts',
-          lineNumber: 10,
-          content: 'Bad request',
-        }),
-        (err: unknown) => {
-          assert.ok(err instanceof CommentError)
-          assert.strictEqual(err.code, 'MISSING_LINE_TYPE')
-          return true
-        }
-      )
-    })
+    // MISSING_LINE_TYPE runtime validation was removed in favor of
+    // CommentLocation discriminated union + schema-level validation
 
     it('should throw REVIEW_NOT_FOUND for nonexistent review', () => {
       assert.throws(
