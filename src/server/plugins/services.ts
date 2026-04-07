@@ -8,6 +8,7 @@ import { ReviewService } from '../services/review.service.ts'
 import { CommentService } from '../services/comment.service.ts'
 import { ExportService } from '../services/export.service.ts'
 import { GitService, type GitServiceLogger } from '../services/git.service.ts'
+import { createGitAdapter } from '../adapters/git.ts'
 import { ReviewRepository } from '../repositories/review.repo.ts'
 import { ReviewFileRepository } from '../repositories/review-file.repo.ts'
 import { CommentRepository } from '../repositories/comment.repo.ts'
@@ -28,7 +29,7 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
       return new ReviewService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
-        new GitService(fastify.config.repositoryPath, log),
+        new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log),
       )
     },
     comment: () => {
@@ -46,7 +47,7 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
         new CommentRepository(db),
       )
     },
-    git: (log?) => new GitService(fastify.config.repositoryPath, log),
+    git: (log?) => new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log),
     todoRepo: () => new TodoRepository(getDatabase()),
   }
 

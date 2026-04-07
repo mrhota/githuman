@@ -5,6 +5,19 @@ import { createConfig } from '../../../src/server/config.ts'
 import { initDatabase, closeDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader } from '../helpers.ts'
+import type { ChangeDetector } from '../../../src/server/ports.ts'
+
+function createFakeChangeDetector () {
+  const calls: string[] = []
+  return {
+    calls,
+    detector: {
+      async start () { calls.push('start') },
+      async stop () { calls.push('stop') },
+      async checkNow () { calls.push('checkNow') },
+    } satisfies ChangeDetector,
+  }
+}
 
 describe('events routes', () => {
   let app: FastifyInstance
@@ -109,6 +122,45 @@ describe('events routes', () => {
 
       assert.strictEqual(response.statusCode, 400)
     })
+
+    it('should call checkNow on changeDetector when type is files', async () => {
+      const { calls, detector } = createFakeChangeDetector()
+
+      // Replace the changeDetector on the app instance
+      ;(app as unknown as Record<string, unknown>).changeDetector = detector
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/events/notify',
+        headers: authHeader(),
+        payload: { type: 'files' },
+      })
+
+      assert.strictEqual(response.statusCode, 200)
+      assert.ok(calls.includes('checkNow'), 'Expected checkNow to be called')
+    })
+
+    it('should emit to eventBus for non-files types', async () => {
+      const emittedEvents: Array<{ type: string; data: unknown }> = []
+      const originalEmit = app.eventBus.emit.bind(app.eventBus)
+
+      // Spy on eventBus.emit
+      app.eventBus.emit = async (type, data) => {
+        emittedEvents.push({ type, data })
+        return originalEmit(type, data)
+      }
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/events/notify',
+        headers: authHeader(),
+        payload: { type: 'todos', action: 'created' },
+      })
+
+      assert.strictEqual(response.statusCode, 200)
+      assert.strictEqual(emittedEvents.length, 1)
+      assert.strictEqual(emittedEvents[0].type, 'todos')
+    })
   })
 
   // Note: GET /api/events (SSE endpoint) cannot be easily tested with Fastify's inject
@@ -133,6 +185,22 @@ describe('events routes', () => {
       // If the SIGINT fix regresses, this would hang until timeout
       const elapsed = Date.now() - startTime
       assert.ok(elapsed < 2000, `Server close took ${elapsed}ms, expected < 2000ms`)
+    })
+  })
+
+  describe('plugin registration', () => {
+    it('should register without async work (no timeout)', async () => {
+      const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
+      initDatabase(config.dbPath)
+
+      const startTime = Date.now()
+      const testApp = await buildApp(config, { logger: false, serveStatic: false })
+      const elapsed = Date.now() - startTime
+
+      // Plugin registration should be fast (< 1 second) since no async file watching
+      assert.ok(elapsed < 1000, `Plugin registration took ${elapsed}ms, expected < 1000ms`)
+
+      await testApp.close()
     })
   })
 })

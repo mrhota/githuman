@@ -21,7 +21,9 @@ import todoRoutes from './routes/todos.ts'
 import gitRoutes from './routes/git.ts'
 import eventsRoutes from './routes/events.ts'
 import { createEventBus } from './adapters/event-bus.ts'
-import type { EventBus } from './ports.ts'
+import { createGitAdapter } from './adapters/git.ts'
+import { createChangeDetector } from './adapters/change-detector.ts'
+import type { EventBus, ChangeDetector } from './ports.ts'
 import type { ServerConfig } from './config.ts'
 import type { HealthResponse } from '../shared/types.ts'
 import { HealthResponseSchema } from './schemas/common.ts'
@@ -193,6 +195,11 @@ export async function buildApp (
   const eventBus = createEventBus()
   app.decorate('eventBus', eventBus)
 
+  // Create and decorate the ChangeDetector
+  const gitAdapter = createGitAdapter(config.repositoryPath)
+  const changeDetector = createChangeDetector(gitAdapter, eventBus, 2000)
+  app.decorate('changeDetector', changeDetector)
+
   // Register routes
   await app.register(diffRoutes)
   await app.register(imageRoute)
@@ -201,6 +208,16 @@ export async function buildApp (
   await app.register(todoRoutes)
   await app.register(gitRoutes)
   await app.register(eventsRoutes)
+
+  // Start change detection when server is ready
+  app.addHook('onReady', async () => {
+    await changeDetector.start()
+  })
+
+  // Stop change detection on close (before other cleanup)
+  app.addHook('onClose', async () => {
+    await changeDetector.stop()
+  })
 
   // Serve static files if enabled and dist/web exists
   if (options.serveStatic !== false) {
@@ -230,5 +247,6 @@ declare module 'fastify' {
   interface FastifyInstance {
     config: ServerConfig;
     eventBus: EventBus;
+    changeDetector: ChangeDetector;
   }
 }

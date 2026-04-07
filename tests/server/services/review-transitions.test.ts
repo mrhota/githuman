@@ -5,6 +5,7 @@ import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
 import { GitService } from '../../../src/server/services/git.service.ts'
+import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 import type { ReviewStatus } from '../../../src/shared/types.ts'
 
 /**
@@ -46,7 +47,7 @@ describe('review status transitions', () => {
       service: new ReviewService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
-        new GitService(process.cwd()),
+        new GitService(createGitAdapter(process.cwd()), process.cwd()),
       ),
       db,
     }

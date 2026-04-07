@@ -1,13 +1,10 @@
 /**
  * Server-Sent Events (SSE) routes for real-time updates
  * Uses EventBus port for local event dispatching
- * Includes file watching for live unstaged diff updates
+ * ChangeDetector lifecycle is managed by app.ts, not here
  */
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import chokidar, { type FSWatcher } from 'chokidar'
-import { relative } from 'node:path'
 import { SuccessSchema } from '../schemas/common.ts'
-import { loadGitignore } from '../utils/gitignore.ts'
 import type { EventType } from '../ports.ts'
 
 // Re-export EventType so existing consumers don't break
@@ -33,77 +30,8 @@ const NotifyBodySchema = Type.Object(
   { description: 'Notification payload' }
 )
 
-// Debounce helper for file watcher
-function debounce<T extends (...args: unknown[]) => void> (fn: T, ms: number): T {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-  return ((...args: unknown[]) => {
-    if (timeoutId) clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => fn(...args), ms)
-  }) as T
-}
-
 const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
   const eventBus = fastify.eventBus
-
-  // Set up file watcher for live updates
-  let fileWatcher: FSWatcher | null = null
-  const repoPath = fastify.config.repositoryPath
-
-  // Debounced broadcast to avoid flooding on rapid file changes
-  const broadcastFileChange = debounce(() => {
-    eventBus.emit('files', { action: 'updated' })
-    fastify.log.debug('File change detected, broadcasting event')
-  }, 300)
-
-  // Start watching when we have connected clients
-  const startWatching = async () => {
-    if (fileWatcher) return
-
-    try {
-      // Load gitignore patterns for filtering
-      const ig = await loadGitignore(repoPath, fastify.log)
-
-      fileWatcher = chokidar.watch(repoPath, {
-        ignored: (filePath: string) => {
-          // Get path relative to repo root for gitignore matching
-          const relativePath = relative(repoPath, filePath)
-          // Empty relative path means it's the repo root itself
-          if (!relativePath) return false
-          return ig.ignores(relativePath)
-        },
-        ignoreInitial: true,
-        persistent: true,
-        // Use polling on macOS to avoid FSEvents file descriptor issues
-        // that cause EBADF errors when spawning child processes (e.g., git)
-        usePolling: process.platform === 'darwin',
-        interval: 1000,
-      })
-
-      fileWatcher.on('all', () => {
-        broadcastFileChange()
-      })
-
-      fileWatcher.on('error', (err) => {
-        fastify.log.warn({ err }, 'File watcher error')
-        stopWatching()
-      })
-
-      fastify.log.info({ path: repoPath }, 'File watcher started')
-    } catch (err) {
-      fastify.log.warn({ err }, 'Failed to start file watcher')
-    }
-  }
-
-  const stopWatching = async () => {
-    if (fileWatcher) {
-      await fileWatcher.close()
-      fileWatcher = null
-      fastify.log.info('File watcher stopped')
-    }
-  }
-
-  // Start watching immediately (could optimize to start only when clients connect)
-  await startWatching()
 
   // Clean up on server close
   fastify.addHook('onClose', async () => {
@@ -120,8 +48,6 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
 
     // Close the event bus
     await eventBus.close()
-
-    await stopWatching()
   })
 
   /**
@@ -196,7 +122,11 @@ const eventsRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
     async (request) => {
       const { type, action } = request.body
-      await eventBus.emit(type, { action })
+      if (type === 'files') {
+        await fastify.changeDetector.checkNow()
+      } else {
+        await eventBus.emit(type, { action })
+      }
       request.log.info({ type, action, clients: clientCount }, 'Event broadcast')
       return { success: true }
     }
