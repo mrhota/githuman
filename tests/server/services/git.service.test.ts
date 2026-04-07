@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { GitService } from '../../../src/server/services/git.service.ts'
+import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 
 interface TestContext {
   after: (fn: () => void) => void;
@@ -62,7 +63,7 @@ describe('git.service', () => {
   describe('getCommits', () => {
     it('should return an array of commits', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 5 })
 
@@ -74,7 +75,7 @@ describe('git.service', () => {
 
     it('should return commits with required properties', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 1 })
 
@@ -90,7 +91,7 @@ describe('git.service', () => {
 
     it('should respect the limit parameter', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result3 = await git.getCommits({ limit: 3 })
       const result10 = await git.getCommits({ limit: 10 })
@@ -102,7 +103,7 @@ describe('git.service', () => {
 
     it('should return commits in order (newest first)', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 5 })
 
@@ -116,7 +117,7 @@ describe('git.service', () => {
 
     it('should support offset for pagination', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const firstPage = await git.getCommits({ limit: 2, offset: 0 })
       const secondPage = await git.getCommits({ limit: 2, offset: 2 })
@@ -129,7 +130,7 @@ describe('git.service', () => {
 
     it('should indicate hasMore when there are more commits', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 1 })
 
@@ -141,7 +142,7 @@ describe('git.service', () => {
   describe('getCommitsDiff', () => {
     it('should return empty string for empty commits array', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const diff = await git.getCommitsDiff([])
       assert.strictEqual(diff, '')
@@ -149,7 +150,7 @@ describe('git.service', () => {
 
     it('should return diff for a single commit', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 1 })
       assert.ok(result.commits.length > 0, 'Need at least one commit to test')
@@ -163,7 +164,7 @@ describe('git.service', () => {
 
     it('should return combined diff for multiple commits', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 3 })
       assert.ok(result.commits.length >= 2, 'Need at least 2 commits')
@@ -177,7 +178,7 @@ describe('git.service', () => {
 
     it('should handle commits in any order', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 3 })
       assert.ok(result.commits.length >= 2, 'Need at least 2 commits')
@@ -197,7 +198,7 @@ describe('git.service', () => {
   describe('getCommitsFileDiff', () => {
     it('should return empty string for empty commits array', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const diff = await git.getCommitsFileDiff([], 'some-file.ts')
       assert.strictEqual(diff, '')
@@ -205,7 +206,7 @@ describe('git.service', () => {
 
     it('should return diff for a specific file in a commit', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Add a new file and commit
       writeFileSync(join(tempDir, 'src.ts'), 'const x = 1;\n')
@@ -222,7 +223,7 @@ describe('git.service', () => {
 
     it('should return empty string for non-existent file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await testGit.getCommits({ limit: 1 })
       const sha = result.commits[0].sha
@@ -233,7 +234,7 @@ describe('git.service', () => {
 
     it('should combine diffs from multiple commits for same file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // First commit: add file
       writeFileSync(join(tempDir, 'src.ts'), 'const x = 1;\n')
@@ -257,7 +258,7 @@ describe('git.service', () => {
   describe('getBranchFileDiff', () => {
     it('should return diff for a specific file between branches', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Get the main branch name
       const mainBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: tempDir }).toString().trim()
@@ -275,7 +276,7 @@ describe('git.service', () => {
 
     it('should return empty string for file not changed in branch', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Get the main branch name
       const mainBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: tempDir }).toString().trim()
@@ -292,7 +293,7 @@ describe('git.service', () => {
 
     it('should return empty string for non-existent branch', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const diff = await testGit.getBranchFileDiff('non-existent-branch', 'README.md')
       assert.strictEqual(diff, '')
@@ -302,7 +303,7 @@ describe('git.service', () => {
   describe('getBranches', () => {
     it('should return an array of branches', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const branches = await git.getBranches()
 
@@ -312,7 +313,7 @@ describe('git.service', () => {
 
     it('should have one current branch', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const branches = await git.getBranches()
       const currentBranches = branches.filter(b => b.isCurrent)
@@ -322,7 +323,7 @@ describe('git.service', () => {
 
     it('should return branches with required properties', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const branches = await git.getBranches()
 
@@ -337,14 +338,14 @@ describe('git.service', () => {
   describe('isRepo', () => {
     it('should return true for a git repository', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.isRepo()
       assert.strictEqual(result, true)
     })
 
     it('should return false for a non-git directory', async () => {
-      const nonGit = new GitService('/tmp')
+      const nonGit = new GitService(createGitAdapter('/tmp'), '/tmp')
       const result = await nonGit.isRepo()
       assert.strictEqual(result, false)
     })
@@ -353,14 +354,14 @@ describe('git.service', () => {
   describe('hasCommits', () => {
     it('should return true for a repository with commits', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.hasCommits()
       assert.strictEqual(result, true)
     })
 
     it('should return false for a non-git directory', async () => {
-      const nonGit = new GitService('/tmp')
+      const nonGit = new GitService(createGitAdapter('/tmp'), '/tmp')
       const result = await nonGit.hasCommits()
       assert.strictEqual(result, false)
     })
@@ -369,7 +370,7 @@ describe('git.service', () => {
   describe('getCurrentBranch', () => {
     it('should return the current branch name', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const branch = await git.getCurrentBranch()
 
@@ -381,7 +382,7 @@ describe('git.service', () => {
   describe('getUnstagedFiles', () => {
     it('should return empty array when no unstaged changes', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const files = await testGit.getUnstagedFiles()
       assert.deepStrictEqual(files, [])
@@ -389,7 +390,7 @@ describe('git.service', () => {
 
     it('should return modified files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Modify the file
       writeFileSync(join(tempDir, 'README.md'), '# Updated\n')
@@ -402,7 +403,7 @@ describe('git.service', () => {
 
     it('should return untracked files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create a new file
       writeFileSync(join(tempDir, 'new-file.txt'), 'new content\n')
@@ -417,7 +418,7 @@ describe('git.service', () => {
   describe('hasUnstagedChanges', () => {
     it('should return false when no unstaged changes', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await testGit.hasUnstagedChanges()
       assert.strictEqual(result, false)
@@ -425,7 +426,7 @@ describe('git.service', () => {
 
     it('should return true when there are modified files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'README.md'), '# Updated\n')
 
@@ -435,7 +436,7 @@ describe('git.service', () => {
 
     it('should return true when there are untracked files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'new-file.txt'), 'content\n')
 
@@ -447,7 +448,7 @@ describe('git.service', () => {
   describe('getUnstagedDiff', () => {
     it('should return empty string when no unstaged changes', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const diff = await testGit.getUnstagedDiff()
       assert.strictEqual(diff, '')
@@ -455,7 +456,7 @@ describe('git.service', () => {
 
     it('should return diff for modified files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'README.md'), '# Updated content\n')
 
@@ -467,7 +468,7 @@ describe('git.service', () => {
 
     it('should include untracked files in diff', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create a new untracked file
       writeFileSync(join(tempDir, 'new-file.txt'), 'line 1\nline 2\n')
@@ -483,7 +484,7 @@ describe('git.service', () => {
   describe('stageFile', () => {
     it('should stage a single file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'new-file.txt'), 'content\n')
 
@@ -501,7 +502,7 @@ describe('git.service', () => {
   describe('stageFiles', () => {
     it('should stage multiple files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'file1.txt'), 'content1\n')
       writeFileSync(join(tempDir, 'file2.txt'), 'content2\n')
@@ -516,7 +517,7 @@ describe('git.service', () => {
 
     it('should do nothing when passed empty array', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       await testGit.stageFiles([])
 
@@ -527,7 +528,7 @@ describe('git.service', () => {
   describe('stageAll', () => {
     it('should stage all changes including untracked files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'README.md'), '# Updated\n')
       writeFileSync(join(tempDir, 'new-file.txt'), 'content\n')
@@ -550,7 +551,7 @@ describe('git.service', () => {
   describe('unstageFile', () => {
     it('should unstage a file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       writeFileSync(join(tempDir, 'new-file.txt'), 'content\n')
       await testGit.stageFile('new-file.txt')
@@ -567,7 +568,7 @@ describe('git.service', () => {
   describe('getFilesAtRef', () => {
     it('should return all files at HEAD', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const files = await git.getFilesAtRef('HEAD')
 
@@ -578,7 +579,7 @@ describe('git.service', () => {
 
     it('should return files at a specific commit SHA', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 1 })
       assert.ok(result.commits.length > 0, 'Need at least one commit to test')
@@ -591,7 +592,7 @@ describe('git.service', () => {
 
     it('should throw for invalid ref', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       await assert.rejects(
         async () => git.getFilesAtRef('invalid-ref-that-does-not-exist-xyz'),
@@ -601,7 +602,7 @@ describe('git.service', () => {
 
     it('should return files from test repo', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Add another file and commit - create dir first
       execSync('mkdir -p src', { cwd: tempDir, stdio: 'ignore' })
@@ -622,7 +623,7 @@ describe('git.service', () => {
   describe('getWorkingDirectoryNewFiles', () => {
     it('should return empty array when no new files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       const files = await testGit.getWorkingDirectoryNewFiles()
       assert.deepStrictEqual(files, [])
@@ -630,7 +631,7 @@ describe('git.service', () => {
 
     it('should return untracked files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create a new untracked file
       writeFileSync(join(tempDir, 'new-file.txt'), 'content\n')
@@ -641,7 +642,7 @@ describe('git.service', () => {
 
     it('should return staged new files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create and stage a new file
       writeFileSync(join(tempDir, 'staged-new.txt'), 'content\n')
@@ -653,7 +654,7 @@ describe('git.service', () => {
 
     it('should return both untracked and staged new files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create an untracked file
       writeFileSync(join(tempDir, 'untracked.txt'), 'content\n')
@@ -670,7 +671,7 @@ describe('git.service', () => {
 
     it('should not include modified files', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Modify an existing tracked file
       writeFileSync(join(tempDir, 'README.md'), '# Updated\n')
@@ -682,7 +683,7 @@ describe('git.service', () => {
 
     it('should handle files in subdirectories', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const testGit = new GitService(tempDir)
+      const testGit = new GitService(createGitAdapter(tempDir), tempDir)
 
       // Create a new file in a subdirectory
       execSync('mkdir -p src/utils', { cwd: tempDir, stdio: 'ignore' })
@@ -696,7 +697,7 @@ describe('git.service', () => {
   describe('getWorkingFileContent - directory traversal prevention', () => {
     it('should return file contents for a valid relative path', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('README.md')
       assert.strictEqual(content, '# Test\n')
@@ -706,7 +707,7 @@ describe('git.service', () => {
       const tempDir = createTestRepoWithCommit(t)
       mkdirSync(join(tempDir, 'src'))
       writeFileSync(join(tempDir, 'src/index.ts'), 'export const x = 1;\n')
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('src/index.ts')
       assert.strictEqual(content, 'export const x = 1;\n')
@@ -716,7 +717,7 @@ describe('git.service', () => {
       const tempDir = createTestRepoWithCommit(t)
       mkdirSync(join(tempDir, 'src'))
       writeFileSync(join(tempDir, 'src/index.ts'), 'export const x = 1;\n')
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('./src/../src/index.ts')
       assert.strictEqual(content, 'export const x = 1;\n')
@@ -724,7 +725,7 @@ describe('git.service', () => {
 
     it('should block simple traversal with ../', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('../etc/passwd')
       assert.strictEqual(content, null)
@@ -732,7 +733,7 @@ describe('git.service', () => {
 
     it('should block deep traversal with ../../', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('../../etc/passwd')
       assert.strictEqual(content, null)
@@ -740,7 +741,7 @@ describe('git.service', () => {
 
     it('should block mixed traversal like src/../../etc/passwd', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('src/../../etc/passwd')
       assert.strictEqual(content, null)
@@ -748,7 +749,7 @@ describe('git.service', () => {
 
     it('should block absolute paths outside repo', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('/etc/passwd')
       assert.strictEqual(content, null)
@@ -756,7 +757,7 @@ describe('git.service', () => {
 
     it('should return null for nonexistent file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('no-such-file.txt')
       assert.strictEqual(content, null)
@@ -769,7 +770,7 @@ describe('git.service', () => {
         debug: () => {},
         warn: (obj: unknown, _msg: string) => warnings.push(obj),
       }
-      const git = new GitService(tempDir, logger)
+      const git = new GitService(createGitAdapter(tempDir), tempDir, logger)
 
       await git.getWorkingFileContent('../etc/passwd')
       assert.strictEqual(warnings.length, 1)
@@ -778,7 +779,7 @@ describe('git.service', () => {
 
     it('should not crash when traversal is blocked without a logger', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingFileContent('../etc/passwd')
       assert.strictEqual(content, null)
@@ -790,7 +791,7 @@ describe('git.service', () => {
       const tempDir = createTestRepoWithCommit(t)
       const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])
       writeFileSync(join(tempDir, 'image.png'), binaryData)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingBinaryContent('image.png')
       assert.ok(Buffer.isBuffer(content))
@@ -799,7 +800,7 @@ describe('git.service', () => {
 
     it('should block traversal with ../', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingBinaryContent('../outside.bin')
       assert.strictEqual(content, null)
@@ -807,7 +808,7 @@ describe('git.service', () => {
 
     it('should block absolute paths outside repo', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingBinaryContent('/etc/passwd')
       assert.strictEqual(content, null)
@@ -815,7 +816,7 @@ describe('git.service', () => {
 
     it('should block mixed traversal', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingBinaryContent('src/../../etc/passwd')
       assert.strictEqual(content, null)
@@ -823,7 +824,7 @@ describe('git.service', () => {
 
     it('should return null for nonexistent file', async (t) => {
       const tempDir = createTestRepoWithCommit(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const content = await git.getWorkingBinaryContent('no-such-file.bin')
       assert.strictEqual(content, null)
@@ -833,7 +834,7 @@ describe('git.service', () => {
   describe('sanitizeSearch - regex injection prevention', () => {
     it('should pass through normal search text', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 10, search: 'First' })
       assert.ok(result.commits.length >= 1)
@@ -842,7 +843,7 @@ describe('git.service', () => {
 
     it('should not crash with regex metacharacters in search', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 10, search: '*+?[]{}()^$|\\' })
       assert.ok(Array.isArray(result.commits))
@@ -850,7 +851,7 @@ describe('git.service', () => {
 
     it('should handle very long search strings without error', async (t) => {
       const tempDir = createTestRepoWithMultipleCommits(t)
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const longSearch = 'a'.repeat(150)
       const result = await git.getCommits({ limit: 10, search: longSearch })
@@ -862,7 +863,7 @@ describe('git.service', () => {
       writeFileSync(join(tempDir, 'file.txt'), 'content\n')
       execSync('git add file.txt', { cwd: tempDir, stdio: 'ignore' })
       execSync('git commit -m "it\'s a \\"test\\""', { cwd: tempDir, stdio: 'ignore' })
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
 
       const result = await git.getCommits({ limit: 10, search: "it's" })
       assert.ok(result.commits.length >= 1)
@@ -879,7 +880,7 @@ describe('git.service', () => {
       }
 
       // Should construct without error
-      const git = new GitService(tempDir, logger)
+      const git = new GitService(createGitAdapter(tempDir), tempDir, logger)
       assert.ok(git)
     })
 
@@ -891,7 +892,7 @@ describe('git.service', () => {
         warn: (_obj: unknown, msg: string) => messages.push({ level: 'warn', msg }),
       }
 
-      const git = new GitService(tempDir, logger)
+      const git = new GitService(createGitAdapter(tempDir), tempDir, logger)
       // isRepo on a valid repo shouldn't log, but getCurrentBranch on empty repo will
       await git.getCurrentBranch()
 
@@ -903,7 +904,7 @@ describe('git.service', () => {
     it('should work without a logger (backwards compatible)', (t: TestContext) => {
       const tempDir = createTestRepo(t)
       // No logger argument — should not throw
-      const git = new GitService(tempDir)
+      const git = new GitService(createGitAdapter(tempDir), tempDir)
       assert.ok(git)
     })
   })

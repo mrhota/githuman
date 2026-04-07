@@ -9,6 +9,7 @@ import { ReviewFileRepository } from '../../server/repositories/review-file.repo
 import { CommentRepository } from '../../server/repositories/comment.repo.ts'
 import { ReviewService, ReviewError } from '../../server/services/review.service.ts'
 import { GitService } from '../../server/services/git.service.ts'
+import { createGitAdapter } from '../../server/adapters/git.ts'
 
 function printHelp () {
   console.log(`
@@ -64,7 +65,7 @@ export async function resolveCommand (args: string[]) {
     const reviewRepo = new ReviewRepository(db)
     const fileRepo = new ReviewFileRepository(db)
     const commentRepo = new CommentRepository(db)
-    const git = new GitService(process.cwd())
+    const git = new GitService(createGitAdapter(process.cwd()), process.cwd())
     const reviewService = new ReviewService(reviewRepo, fileRepo, git)
 
     // Handle "last" keyword

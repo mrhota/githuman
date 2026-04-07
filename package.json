@@ -65,10 +65,8 @@
     "@fastify/swagger": "^9.0.0",
     "@fastify/swagger-ui": "^5.0.0",
     "@fastify/type-provider-typebox": "^6.1.0",
-    "chokidar": "^5.0.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",
-    "ignore": "^7.0.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
@@ -78,7 +76,6 @@
     "remark-gfm": "^4.0.1",
     "selfsigned": "^5.5.0",
     "shiki": "^1.0.0",
-    "simple-git": "^3.25.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

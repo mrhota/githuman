@@ -1,11 +1,10 @@
 /**
  * Git service - handles all git operations
  */
-import { simpleGit, type SimpleGit } from 'simple-git'
-import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { RepositoryInfo } from '../../shared/types.ts'
+import type { GitPort } from '../ports.ts'
 
 export interface GitServiceLogger {
   debug: (obj: unknown, msg: string) => void
@@ -13,13 +12,13 @@ export interface GitServiceLogger {
 }
 
 export class GitService {
-  private git: SimpleGit
+  private git: GitPort
   private repoPath: string
   private log?: GitServiceLogger
 
-  constructor (repoPath: string, log?: GitServiceLogger) {
+  constructor (git: GitPort, repoPath: string, log?: GitServiceLogger) {
+    this.git = git
     this.repoPath = repoPath
-    this.git = simpleGit(repoPath)
     this.log = log
   }
 
@@ -53,8 +52,7 @@ export class GitService {
    * Get the repository root directory
    */
   async getRepoRoot (): Promise<string> {
-    const root = await this.git.revparse(['--show-toplevel'])
-    return root.trim()
+    return this.git.revparse(['--show-toplevel'])
   }
 
   /**
@@ -64,7 +62,7 @@ export class GitService {
     const [root, branch, remotes] = await Promise.all([
       this.getRepoRoot(),
       this.getCurrentBranch(),
-      this.git.getRemotes(true),
+      this.git.getRemotes(),
     ])
 
     const name = root.split('/').pop() ?? 'unknown'
@@ -84,14 +82,12 @@ export class GitService {
    */
   async getCurrentBranch (): Promise<string | null> {
     try {
-      const branch = await this.git.revparse(['--abbrev-ref', 'HEAD'])
-      return branch.trim()
+      return await this.git.revparse(['--abbrev-ref', 'HEAD'])
     } catch (err) {
       this.log?.debug({ err, repoPath: this.repoPath }, 'getCurrentBranch revparse failed, trying config')
       // No commits yet - try to get the default branch from config
       try {
-        const defaultBranch = await this.git.raw(['config', '--get', 'init.defaultBranch'])
-        return defaultBranch.trim() || null
+        return await this.git.getConfigValue('init.defaultBranch')
       } catch (configErr) {
         this.log?.debug({ err: configErr, repoPath: this.repoPath }, 'getCurrentBranch config fallback failed')
         return null
@@ -106,53 +102,24 @@ export class GitService {
     const status = await this.git.status()
     const staged: StagedFile[] = []
 
+    const createdSet = new Set(status.created)
+    const deletedSet = new Set(status.deleted)
+    const renamedToSet = new Set(status.renamed.map(r => r.to))
+
     for (const file of status.staged) {
-      staged.push({
-        path: file,
-        status: 'modified',
-      })
-    }
-
-    for (const file of status.created) {
-      if (status.staged.includes(file) || await this.isFileStaged(file)) {
-        staged.push({
-          path: file,
-          status: 'added',
-        })
+      if (createdSet.has(file)) {
+        staged.push({ path: file, status: 'added' })
+      } else if (deletedSet.has(file)) {
+        staged.push({ path: file, status: 'deleted' })
+      } else if (renamedToSet.has(file)) {
+        const rename = status.renamed.find(r => r.to === file)!
+        staged.push({ path: file, oldPath: rename.from, status: 'renamed' })
+      } else {
+        staged.push({ path: file, status: 'modified' })
       }
-    }
-
-    for (const file of status.deleted) {
-      if (await this.isFileStaged(file)) {
-        staged.push({
-          path: file,
-          status: 'deleted',
-        })
-      }
-    }
-
-    for (const file of status.renamed) {
-      staged.push({
-        path: file.to,
-        oldPath: file.from,
-        status: 'renamed',
-      })
     }
 
     return staged
-  }
-
-  /**
-   * Check if a specific file is staged
-   */
-  private async isFileStaged (filePath: string): Promise<boolean> {
-    try {
-      const result = await this.git.diff(['--cached', '--name-only', '--', filePath])
-      return result.trim().length > 0
-    } catch (err) {
-      this.log?.debug({ err, filePath }, 'isFileStaged check failed')
-      return false
-    }
   }
 
   /**
@@ -215,33 +182,20 @@ export class GitService {
     const status = await this.git.status()
     const unstaged: UnstagedFile[] = []
 
-    // Modified files that are not staged
+    // The port's `modified` contains files with worktree changes (M or D in worktree column)
     for (const file of status.modified) {
-      if (!status.staged.includes(file)) {
-        unstaged.push({
-          path: file,
-          status: 'modified',
-        })
-      }
+      unstaged.push({
+        path: file,
+        status: 'modified',
+      })
     }
 
     // New files that are not staged (untracked)
-    for (const file of status.not_added) {
+    for (const file of status.notAdded) {
       unstaged.push({
         path: file,
         status: 'untracked',
       })
-    }
-
-    // Deleted files that are not staged
-    for (const file of status.deleted) {
-      const isStaged = await this.isFileStaged(file)
-      if (!isStaged) {
-        unstaged.push({
-          path: file,
-          status: 'deleted',
-        })
-      }
     }
 
     return unstaged
@@ -252,11 +206,7 @@ export class GitService {
    */
   async hasUnstagedChanges (): Promise<boolean> {
     const status = await this.git.status()
-    return (
-      status.modified.length > 0 ||
-      status.not_added.length > 0 ||
-      status.deleted.some(f => !status.staged.includes(f))
-    )
+    return status.modified.length > 0 || status.notAdded.length > 0
   }
 
   /**
@@ -265,13 +215,13 @@ export class GitService {
    */
   async getUnstagedDiff (): Promise<string> {
     // Get regular diff for tracked files
-    const diff = await this.git.diff()
+    const diff = await this.git.diff([])
 
     // Get untracked files and generate diff for them
     const status = await this.git.status()
     const untrackedDiffs: string[] = []
 
-    for (const filePath of status.not_added) {
+    for (const filePath of status.notAdded) {
       try {
         const fullPath = join(this.repoPath, filePath)
         const content = await readFile(fullPath, 'utf-8')
@@ -305,7 +255,7 @@ export class GitService {
    * Stage a specific file
    */
   async stageFile (filePath: string): Promise<void> {
-    await this.git.add(filePath)
+    await this.git.add([filePath])
   }
 
   /**
@@ -321,7 +271,7 @@ export class GitService {
    * Stage all changes (including untracked files)
    */
   async stageAll (): Promise<void> {
-    await this.git.add('-A')
+    await this.git.add(['-A'])
   }
 
   /**
@@ -336,8 +286,7 @@ export class GitService {
    */
   async getHeadSha (): Promise<string | null> {
     try {
-      const sha = await this.git.revparse(['HEAD'])
-      return sha.trim()
+      return await this.git.revparse(['HEAD'])
     } catch (err) {
       this.log?.debug({ err, repoPath: this.repoPath }, 'getHeadSha failed')
       return null
@@ -420,14 +369,7 @@ export class GitService {
    */
   async getStagedBinaryContent (filePath: string): Promise<Buffer | null> {
     try {
-      // Use execFileSync to get raw binary output - simple-git's raw() returns a string
-      // which corrupts binary data. execFileSync with array args avoids shell injection.
-      const result = execFileSync('git', ['show', `:${filePath}`], {
-        cwd: this.repoPath,
-        encoding: 'buffer',
-        maxBuffer: 50 * 1024 * 1024, // 50MB max
-      })
-      return result
+      return await this.git.showBinary([`:${filePath}`])
     } catch (err) {
       this.log?.debug({ err, filePath }, 'getStagedBinaryContent failed')
       return null
@@ -439,14 +381,7 @@ export class GitService {
    */
   async getHeadBinaryContent (filePath: string): Promise<Buffer | null> {
     try {
-      // Use execFileSync to get raw binary output - simple-git's raw() returns a string
-      // which corrupts binary data. execFileSync with array args avoids shell injection.
-      const result = execFileSync('git', ['show', `HEAD:${filePath}`], {
-        cwd: this.repoPath,
-        encoding: 'buffer',
-        maxBuffer: 50 * 1024 * 1024, // 50MB max
-      })
-      return result
+      return await this.git.showBinary([`HEAD:${filePath}`])
     } catch (err) {
       this.log?.debug({ err, filePath }, 'getHeadBinaryContent failed')
       return null
@@ -563,16 +498,23 @@ export class GitService {
    * List all branches (local and remote)
    */
   async getBranches (): Promise<BranchInfo[]> {
-    const result = await this.git.branch(['-a', '-v'])
+    const raw = await this.git.branch(['-a', '-v'])
     const branches: BranchInfo[] = []
 
-    for (const branch of result.all) {
-      const isRemote = branch.startsWith('remotes/')
-      const isCurrent = branch === result.current
-      const name = isRemote ? branch.replace(/^remotes\/origin\//, '') : branch
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+
+      const isCurrent = line.startsWith('*')
+      const trimmed = line.replace(/^\*?\s+/, '')
+      const branchName = trimmed.split(/\s+/)[0]
+
+      if (!branchName) continue
+
+      const isRemote = branchName.startsWith('remotes/')
+      const name = isRemote ? branchName.replace(/^remotes\/origin\//, '') : branchName
 
       // Skip HEAD pointer
-      if (name === 'HEAD') continue
+      if (name === 'HEAD' || name.includes('->')) continue
 
       branches.push({
         name,
