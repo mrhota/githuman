@@ -97,6 +97,8 @@ Side effects are abstracted behind SPI ports defined in `src/server/ports.ts`:
 - **`Clock`** (`() => string`) — injected into all repositories for timestamps. Default: `systemClock` (ISO string).
 - **`IdGenerator`** (`() => string`) — injected into services and `TodoRepository` for UUID generation. Default: `systemIdGenerator`.
 - **`EventBus`** — pub/sub interface for SSE broadcasting. Adapter in `src/server/adapters/event-bus.ts` uses Node.js `EventEmitter`.
+- **`GitPort`** — abstraction over git CLI commands (diff, status, show, add, reset, branch, remotes). Adapter in `src/server/adapters/git.ts` wraps `execFile('git', ...)`.
+- **`ChangeDetector`** — file watcher interface for detecting staged/unstaged changes. Adapter in `src/server/adapters/change-detector.ts`.
 
 When adding new infrastructure dependencies, define a port in `ports.ts` and an adapter in `src/server/adapters/` rather than importing the dependency directly in domain code. In tests, inject fakes:
 
@@ -113,6 +115,29 @@ const repo = new ReviewRepository(db, fakeClock)
 
 The `ServiceFactories` interface on the Fastify instance provides per-request service construction. Routes access services via `fastify.services.review(request.log)`, `fastify.services.comment()`, etc. The `request.log` parameter propagates request-scoped logging to services that shell out to git.
 
+### Services
+
+Beyond the basic CRUD services (`ReviewService`, `CommentService`, `ExportService`, `GitService`), the service layer includes extracted pure-function modules:
+
+- `src/server/services/diff.service.ts` - Unified diff parser (stateless, pure functions)
+- `src/server/services/hunk-resolver.ts` - Lazy-loads hunks per file from stored data or git
+- `src/server/services/review-shaping.ts` - Pure functions for transforming review data into API response shapes
+- `src/server/services/snapshot.ts` - Review snapshot construction utilities
+
+### Repositories
+
+- `src/server/repositories/review.repo.ts` - Review CRUD
+- `src/server/repositories/comment.repo.ts` - Comment CRUD with batch operations
+- `src/server/repositories/review-file.repo.ts` - Per-file diff/hunk storage for lazy loading
+- `src/server/repositories/todo.repo.ts` - Todo CRUD with position-based ordering
+
+### Security
+
+- `src/server/security/brute-force.ts` - Rate limiting on auth attempts
+- `src/server/tls/certificates.ts` - Self-signed certificate generation for HTTPS
+- Path traversal prevention in `GitService`
+- Helmet security headers configured in `app.ts`
+
 ### Dependency Policy
 
 Minimize npm dependencies. Prefer Node.js stdlib or small inline implementations over third-party packages. When evaluating a dependency, the security argument (smaller supply-chain surface) outweighs convenience. If a package is used in 1-2 files with a thin API surface, replace it. Infrastructure dependencies should be behind SPI ports so they can be swapped without touching domain code.
@@ -127,11 +152,20 @@ Uses Node.js native SQLite (`node:sqlite` - requires Node 24+):
 
 ### Shared Types
 
-`src/shared/types.ts` contains TypeScript interfaces shared between server and web client. These are the source of truth for data shapes.
+`src/shared/types.ts` contains TypeScript interfaces shared between server and web client. These are the source of truth for data shapes. Union types used in multiple places should be extracted as named type aliases (e.g., `FileChangeType`, `LineType`, `ReviewSourceType`). When fields are conditionally required together, prefer discriminated unions over independently optional fields — see `ReviewSource` for the pattern.
 
 ### TypeBox Schemas
 
 Routes define TypeBox schemas for OpenAPI documentation and runtime validation. Shared schemas live in `src/server/schemas/` (`common.ts`, `diff.ts`, `review.ts`). Prefer importing shared schemas over defining duplicates in route files.
+
+### Routes
+
+- `src/server/routes/reviews.ts` - Review CRUD and stats
+- `src/server/routes/comments.ts` - Comment CRUD with resolve/unresolve
+- `src/server/routes/todos.ts` - Todo CRUD with position reordering
+- `src/server/routes/diff.ts` - File list, per-file hunks (lazy loading), file content at ref, image serving
+- `src/server/routes/git.ts` - Repository info, branches, file listing, commit history
+- `src/server/routes/events.ts` - SSE endpoint for realtime updates (todos, reviews, comments, files)
 
 ### CLI Structure
 
@@ -146,6 +180,10 @@ React 19 SPA with:
 - TailwindCSS v4 for styling
 - React Router for navigation
 - API calls to `/api/*` endpoints
+
+### Configuration
+
+`src/server/config.ts` defines `ServerConfig` — port (default 3847), host, auth token, repository path (auto-detected from git root), DB path, HTTPS settings. HTTPS is auto-enabled for non-localhost hosts.
 
 ## Environment Variables
 
