@@ -29,14 +29,14 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
       return new ReviewService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
-        new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log),
+        new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log)
       )
     },
     comment: () => {
       const db = getDatabase()
       return new CommentService(
         new CommentRepository(db),
-        new ReviewRepository(db),
+        new ReviewRepository(db)
       )
     },
     export: () => {
@@ -44,7 +44,7 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
       return new ExportService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
-        new CommentRepository(db),
+        new CommentRepository(db)
       )
     },
     git: (log?) => new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log),

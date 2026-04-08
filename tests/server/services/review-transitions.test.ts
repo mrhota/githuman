@@ -47,7 +47,7 @@ describe('review status transitions', () => {
       service: new ReviewService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
-        new GitService(createGitAdapter(process.cwd()), process.cwd()),
+        new GitService(createGitAdapter(process.cwd()), process.cwd())
       ),
       db,
     }

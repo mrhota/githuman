@@ -67,7 +67,7 @@ async function insertReview (dbPath: string, review: {
     snapshotData,
     review.status,
     now,
-    now,
+    now
   )
 
   closeDatabase()

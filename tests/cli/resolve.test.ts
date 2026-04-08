@@ -70,7 +70,7 @@ async function insertReview (dbPath: string, review: {
     snapshotData,
     review.status,
     now,
-    now,
+    now
   )
 
   closeDatabase()
@@ -101,7 +101,7 @@ async function insertComment (dbPath: string, comment: {
     null,
     comment.resolved ? 1 : 0,
     now,
-    now,
+    now
   )
 
   closeDatabase()
