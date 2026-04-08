@@ -26,7 +26,7 @@ describe('dead dependency detection', () => {
   for (const dep of DEAD_DEPS) {
     it(`should have zero imports of "${dep}" in src/`, () => {
       const importPattern = new RegExp(
-        `(?:from\\s+['"]${dep}['"]|require\\s*\\(\\s*['"]${dep}['"]|import\\s+['"]${dep}['"])`,
+        `(?:from\\s+['"]${dep}['"]|require\\s*\\(\\s*['"]${dep}['"]|import\\s+['"]${dep}['"])`
       )
 
       const matches: string[] = []
@@ -40,7 +40,7 @@ describe('dead dependency detection', () => {
       assert.deepStrictEqual(
         matches,
         [],
-        `Expected zero imports of "${dep}" but found in: ${matches.join(', ')}`,
+        `Expected zero imports of "${dep}" but found in: ${matches.join(', ')}`
       )
     })
   }

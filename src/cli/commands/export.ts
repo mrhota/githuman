@@ -72,7 +72,7 @@ export async function exportCommand (args: string[]) {
     const exportService = new ExportService(
       new ReviewRepository(db),
       new ReviewFileRepository(db),
-      new CommentRepository(db),
+      new CommentRepository(db)
     )
 
     const markdown = exportService.exportToMarkdown(reviewId, {
