@@ -20,7 +20,7 @@
     "build:web": "vite build",
     "start": "node dist/cli/index.js serve",
     "test": "npm run test:server && npm run test:cli && npm run test:web",
-    "test:server": "node --test 'tests/server/**/*.test.ts'",
+    "test:server": "node --test --test-concurrency=8 'tests/server/**/*.test.ts'",
     "test:cli": "node --test 'tests/cli/**/*.test.ts'",
     "test:web": "vitest run",
     "test:e2e": "playwright test",

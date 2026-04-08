@@ -1,39 +1,49 @@
-import { describe, it } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, cpSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 
+// Template repos — created once, copied per test
+let templateRepo: string
+let templateRepoWithCommit: string
+
+before(() => {
+  templateRepo = mkdtempSync(join(tmpdir(), 'git-adapter-template-'))
+  execSync('git init', { cwd: templateRepo, stdio: 'ignore' })
+  execSync('git config user.email "test@test.com"', { cwd: templateRepo, stdio: 'ignore' })
+  execSync('git config user.name "Test"', { cwd: templateRepo, stdio: 'ignore' })
+
+  templateRepoWithCommit = mkdtempSync(join(tmpdir(), 'git-adapter-template-commit-'))
+  execSync('git init', { cwd: templateRepoWithCommit, stdio: 'ignore' })
+  execSync('git config user.email "test@test.com"', { cwd: templateRepoWithCommit, stdio: 'ignore' })
+  execSync('git config user.name "Test"', { cwd: templateRepoWithCommit, stdio: 'ignore' })
+  writeFileSync(join(templateRepoWithCommit, 'README.md'), '# Test\n')
+  execSync('git add README.md', { cwd: templateRepoWithCommit, stdio: 'ignore' })
+  execSync('git commit -m "Initial commit"', { cwd: templateRepoWithCommit, stdio: 'ignore' })
+})
+
+after(() => {
+  rmSync(templateRepo, { recursive: true, force: true })
+  rmSync(templateRepoWithCommit, { recursive: true, force: true })
+})
+
 interface TestContext {
   after: (fn: () => void) => void;
 }
 
-function createTestRepo (t: TestContext): string {
+function copyRepo (template: string, t: TestContext): string {
   const tempDir = mkdtempSync(join(tmpdir(), 'git-adapter-test-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-
-  t.after(() => {
-    rmSync(tempDir, { recursive: true, force: true })
-  })
-
-  return tempDir
-}
-
-function createTestRepoWithCommit (t: TestContext): string {
-  const tempDir = createTestRepo(t)
-  writeFileSync(join(tempDir, 'README.md'), '# Test\n')
-  execSync('git add README.md', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
+  cpSync(template, tempDir, { recursive: true })
+  t.after(() => rmSync(tempDir, { recursive: true, force: true }))
   return tempDir
 }
 
 describe('Git adapter', () => {
   it('revparse returns trimmed output', async (t) => {
-    const tempDir = createTestRepo(t)
+    const tempDir = copyRepo(templateRepo, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.revparse(['--git-dir'])
@@ -42,7 +52,7 @@ describe('Git adapter', () => {
   })
 
   it('status returns structured result with staged files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'staged.txt'), 'staged content\n')
@@ -60,7 +70,7 @@ describe('Git adapter', () => {
   })
 
   it('status returns created files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'new-file.txt'), 'new content\n')
@@ -73,7 +83,7 @@ describe('Git adapter', () => {
   })
 
   it('status returns deleted files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     execSync('git rm README.md', { cwd: tempDir, stdio: 'ignore' })
@@ -85,7 +95,7 @@ describe('Git adapter', () => {
   })
 
   it('status returns renamed files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     execSync('git mv README.md RENAMED.md', { cwd: tempDir, stdio: 'ignore' })
@@ -98,7 +108,7 @@ describe('Git adapter', () => {
   })
 
   it('diff returns unified diff string', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'README.md'), '# Modified content\n')
@@ -109,7 +119,7 @@ describe('Git adapter', () => {
   })
 
   it('show returns file content at ref', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'show-test.txt'), 'show content\n')
@@ -121,7 +131,7 @@ describe('Git adapter', () => {
   })
 
   it('showBinary returns Buffer', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const binaryContent = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])
@@ -135,7 +145,7 @@ describe('Git adapter', () => {
   })
 
   it('add stages files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'to-add.txt'), 'add me\n')
@@ -147,7 +157,7 @@ describe('Git adapter', () => {
   })
 
   it('reset unstages files', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'to-reset.txt'), 'reset me\n')
@@ -161,7 +171,7 @@ describe('Git adapter', () => {
   })
 
   it('branch returns branch listing', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.branch(['-a', '-v'])
@@ -170,7 +180,7 @@ describe('Git adapter', () => {
   })
 
   it('getRemotes returns empty array for local repo', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.getRemotes()
@@ -179,7 +189,7 @@ describe('Git adapter', () => {
   })
 
   it('getRemotes returns remotes with refs', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     execSync('git remote add origin https://example.com/repo.git', { cwd: tempDir, stdio: 'ignore' })
@@ -194,7 +204,7 @@ describe('Git adapter', () => {
   })
 
   it('raw executes arbitrary git commands', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.raw(['ls-tree', '-r', '--name-only', 'HEAD'])
@@ -203,7 +213,7 @@ describe('Git adapter', () => {
   })
 
   it('statusPorcelain returns porcelain v2 output', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     writeFileSync(join(tempDir, 'README.md'), '# Changed\n')
@@ -215,7 +225,7 @@ describe('Git adapter', () => {
   })
 
   it('statusPorcelain returns empty for clean repo', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.statusPorcelain()
@@ -240,7 +250,7 @@ describe('Git adapter', () => {
   })
 
   it('getConfigValue returns configured value', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const email = await git.getConfigValue('user.email')
@@ -248,7 +258,7 @@ describe('Git adapter', () => {
   })
 
   it('getConfigValue returns null for missing key', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     const result = await git.getConfigValue('nonexistent.key')
@@ -256,11 +266,11 @@ describe('Git adapter', () => {
   })
 
   it('show throws for nonexistent ref', async (t) => {
-    const tempDir = createTestRepoWithCommit(t)
+    const tempDir = copyRepo(templateRepoWithCommit, t)
     const git = createGitAdapter(tempDir)
 
     await assert.rejects(
-      () => git.show(['nonexistent-ref:nonexistent-file']),
+      () => git.show(['nonexistent-ref:nonexistent-file'])
     )
   })
 })

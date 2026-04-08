@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 import { createChangeDetector } from '../../../src/server/adapters/change-detector.ts'
-import type { EventBus, GitPort } from '../../../src/server/ports.ts'
+import { createFakeGitPort } from '../helpers.ts'
+import type { EventBus } from '../../../src/server/ports.ts'
 
 interface TestContext {
   after: (fn: () => void) => void
@@ -43,23 +44,6 @@ function createFakeEventBus () {
       removeListener () {},
       async close () {},
     } satisfies EventBus,
-  }
-}
-
-function createFakeGitPort (statusFn: () => Promise<string>): GitPort {
-  return {
-    statusPorcelain: statusFn,
-    revparse: async () => '',
-    status: async () => ({ staged: [], modified: [], created: [], deleted: [], renamed: [], notAdded: [] }),
-    diff: async () => '',
-    show: async () => '',
-    showBinary: async () => Buffer.alloc(0),
-    add: async () => {},
-    reset: async () => {},
-    branch: async () => '',
-    getRemotes: async () => [],
-    getConfigValue: async () => null,
-    raw: async () => '',
   }
 }
 
@@ -165,10 +149,12 @@ describe('ChangeDetector', () => {
 
   it('checkNow() serializes with in-flight check', async (t) => {
     let callCount = 0
-    const fakeGit = createFakeGitPort(async () => {
-      callCount++
-      await wait(100)
-      return `output-${callCount}`
+    const fakeGit = createFakeGitPort({
+      statusPorcelain: async () => {
+        callCount++
+        await wait(100)
+        return `output-${callCount}`
+      },
     })
     const { bus } = createFakeEventBus()
 
@@ -189,13 +175,15 @@ describe('ChangeDetector', () => {
     let concurrency = 0
     let maxConcurrency = 0
     let callCount = 0
-    const fakeGit = createFakeGitPort(async () => {
-      concurrency++
-      maxConcurrency = Math.max(maxConcurrency, concurrency)
-      callCount++
-      await wait(80)
-      concurrency--
-      return `output-${callCount}`
+    const fakeGit = createFakeGitPort({
+      statusPorcelain: async () => {
+        concurrency++
+        maxConcurrency = Math.max(maxConcurrency, concurrency)
+        callCount++
+        await wait(80)
+        concurrency--
+        return `output-${callCount}`
+      },
     })
     const { bus } = createFakeEventBus()
 
