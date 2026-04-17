@@ -249,6 +249,30 @@ describe('ChangeDetector', () => {
     assert.strictEqual(events[0].type, 'files')
   })
 
+  it('scheduled polling triggers check after interval', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    let callCount = 0
+    const fakeGit = createFakeGitPort({
+      statusPorcelain: async () => {
+        callCount++
+        return `output-${callCount}`
+      },
+    })
+    const { events, bus } = createFakeEventBus()
+
+    const detector = createChangeDetector(fakeGit, bus, 100)
+    t.after(async () => { await detector.stop() })
+
+    await detector.start()
+    assert.strictEqual(callCount, 1, 'initial capture on start')
+
+    t.mock.timers.tick(100)
+    await new Promise<void>(resolve => process.nextTick(resolve))
+    assert.strictEqual(callCount, 2, 'poll fired after interval')
+    assert.strictEqual(events.length, 1, 'emitted event for changed output')
+    assert.strictEqual(events[0].type, 'files')
+  })
+
   it('fingerprint is stable for unchanged state', async (t) => {
     const tempDir = createTestRepoWithCommit(t)
     const git = createGitAdapter(tempDir)
