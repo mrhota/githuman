@@ -10,9 +10,10 @@ import { CommentRepository } from '../../server/repositories/comment.repo.ts'
 import { ReviewService, ReviewError } from '../../server/services/review.service.ts'
 import { GitService } from '../../server/services/git.service.ts'
 import { createGitAdapter } from '../../server/adapters/git.ts'
+import { type CliContext, systemCliContext } from '../context.ts'
 
-function printHelp () {
-  console.log(`
+function printHelp (ctx: CliContext) {
+  ctx.stdout(`
 Usage: githuman resolve <review-id|last> [options]
 
 Mark a review as approved and resolve all its comments.
@@ -34,7 +35,7 @@ interface ResolveResult {
   commentsAlreadyResolved: number;
 }
 
-export async function resolveCommand (args: string[]) {
+export async function resolveCommand (args: string[], ctx: CliContext = systemCliContext) {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -45,19 +46,19 @@ export async function resolveCommand (args: string[]) {
   })
 
   if (values.help) {
-    printHelp()
-    process.exit(0)
+    printHelp(ctx)
+    ctx.exit(0)
   }
 
   let reviewId = positionals[0]
 
   if (!reviewId) {
-    console.error('Error: review-id is required\n')
-    printHelp()
-    process.exit(1)
+    ctx.stderr('Error: review-id is required\n')
+    printHelp(ctx)
+    ctx.exit(1)
   }
 
-  const config = createConfig()
+  const config = createConfig({ cwd: ctx.cwd() })
 
   try {
     initDatabase(config.dbPath)
@@ -65,15 +66,15 @@ export async function resolveCommand (args: string[]) {
     const reviewRepo = new ReviewRepository(db)
     const fileRepo = new ReviewFileRepository(db)
     const commentRepo = new CommentRepository(db)
-    const git = new GitService(createGitAdapter(process.cwd()), process.cwd())
+    const git = new GitService(createGitAdapter(ctx.cwd()), ctx.cwd())
     const reviewService = new ReviewService(reviewRepo, fileRepo, git)
 
     // Handle "last" keyword
     if (reviewId === 'last') {
       const lastId = reviewRepo.findLastId()
       if (!lastId) {
-        console.error('Error: No reviews found')
-        process.exit(1)
+        ctx.stderr('Error: No reviews found')
+        ctx.exit(1)
       }
       reviewId = lastId
     }
@@ -81,16 +82,16 @@ export async function resolveCommand (args: string[]) {
     // Get current review to capture previous status
     const review = reviewRepo.findById(reviewId)
     if (!review) {
-      console.error(`Error: Review not found: ${reviewId}`)
-      process.exit(1)
+      ctx.stderr(`Error: Review not found: ${reviewId}`)
+      ctx.exit(1)
     }
 
     const previousStatus = review.status
 
     // Reject if already approved (terminal state - no valid transitions out)
     if (previousStatus === 'approved') {
-      console.error('Error: Invalid status transition from \'approved\' to \'approved\'. Review is already approved.')
-      process.exit(1)
+      ctx.stderr('Error: Invalid status transition from \'approved\' to \'approved\'. Review is already approved.')
+      ctx.exit(1)
     }
 
     // Update review status via service layer (enforces VALID_TRANSITIONS)
@@ -98,8 +99,8 @@ export async function resolveCommand (args: string[]) {
       reviewService.update(reviewId, { status: 'approved' })
     } catch (err) {
       if (err instanceof ReviewError && err.code === 'INVALID_TRANSITION') {
-        console.error(`Error: ${err.message}`)
-        process.exit(1)
+        ctx.stderr(`Error: ${err.message}`)
+        ctx.exit(1)
       }
       throw err
     }
@@ -122,21 +123,21 @@ export async function resolveCommand (args: string[]) {
     }
 
     if (values.json) {
-      console.log(JSON.stringify(result, null, 2))
+      ctx.stdout(JSON.stringify(result, null, 2))
     } else {
-      console.log(`Review ${reviewId} resolved:`)
-      console.log(`  Status: ${previousStatus} -> approved`)
-      console.log(`  Comments resolved: ${unresolvedComments.length}`)
+      ctx.stdout(`Review ${reviewId} resolved:`)
+      ctx.stdout(`  Status: ${previousStatus} -> approved`)
+      ctx.stdout(`  Comments resolved: ${unresolvedComments.length}`)
       if (alreadyResolved > 0) {
-        console.log(`  Comments already resolved: ${alreadyResolved}`)
+        ctx.stdout(`  Comments already resolved: ${alreadyResolved}`)
       }
     }
 
     closeDatabase()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.error('Error: Database does not exist. No reviews have been created yet.')
-      process.exit(1)
+      ctx.stderr('Error: Database does not exist. No reviews have been created yet.')
+      ctx.exit(1)
     } else {
       throw err
     }

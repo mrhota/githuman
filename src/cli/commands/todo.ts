@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { TodoRepository } from '../../server/repositories/todo.repo.ts'
+import { type CliContext, systemCliContext } from '../context.ts'
 
 /**
  * Notify the running server that todos have changed.
@@ -31,8 +32,8 @@ async function notifyServer (config: { port: number; host: string; authToken: st
   }
 }
 
-function printHelp () {
-  console.log(`
+function printHelp (ctx: CliContext) {
+  ctx.stdout(`
 Usage: githuman todo <subcommand> [options]
 
 Manage todo items for tracking tasks during review.
@@ -64,7 +65,7 @@ Examples:
 `)
 }
 
-export async function todoCommand (args: string[]) {
+export async function todoCommand (args: string[], ctx: CliContext = systemCliContext) {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -78,12 +79,12 @@ export async function todoCommand (args: string[]) {
   })
 
   if (values.help || positionals.length === 0) {
-    printHelp()
-    process.exit(0)
+    printHelp(ctx)
+    ctx.exit(0)
   }
 
   const subcommand = positionals[0]
-  const config = createConfig()
+  const config = createConfig({ cwd: ctx.cwd() })
   let didMutate = false
 
   try {
@@ -95,9 +96,9 @@ export async function todoCommand (args: string[]) {
       case 'add': {
         const content = positionals.slice(1).join(' ')
         if (!content) {
-          console.error('Error: Todo content is required')
-          console.error('Usage: githuman todo add <content>')
-          process.exit(1)
+          ctx.stderr('Error: Todo content is required')
+          ctx.stderr('Usage: githuman todo add <content>')
+          ctx.exit(1)
         }
 
         const todo = repo.create({
@@ -108,10 +109,10 @@ export async function todoCommand (args: string[]) {
         })
 
         if (values.json) {
-          console.log(JSON.stringify(todo, null, 2))
+          ctx.stdout(JSON.stringify(todo, null, 2))
         } else {
-          console.log(`Created todo: ${todo.id.slice(0, 8)}`)
-          console.log(`  ${todo.content}`)
+          ctx.stdout(`Created todo: ${todo.id.slice(0, 8)}`)
+          ctx.stdout(`  ${todo.content}`)
         }
         didMutate = true
         break
@@ -136,25 +137,25 @@ export async function todoCommand (args: string[]) {
         }
 
         if (values.json) {
-          console.log(JSON.stringify(todos, null, 2))
+          ctx.stdout(JSON.stringify(todos, null, 2))
         } else if (todos.length === 0) {
-          console.log('No todos found.')
+          ctx.stdout('No todos found.')
         } else {
-          console.log('Todos:\n')
+          ctx.stdout('Todos:\n')
           for (const todo of todos) {
             const statusIcon = todo.completed ? '[x]' : '[ ]'
-            console.log(`${statusIcon} ${todo.content}`)
-            console.log(`    ID: ${todo.id.slice(0, 8)}`)
+            ctx.stdout(`${statusIcon} ${todo.content}`)
+            ctx.stdout(`    ID: ${todo.id.slice(0, 8)}`)
             if (todo.reviewId) {
-              console.log(`    Review: ${todo.reviewId.slice(0, 8)}`)
+              ctx.stdout(`    Review: ${todo.reviewId.slice(0, 8)}`)
             }
-            console.log('')
+            ctx.stdout('')
           }
 
           // Show summary
           const pending = todos.filter(t => !t.completed).length
           const completed = todos.filter(t => t.completed).length
-          console.log(`Total: ${todos.length} (${pending} pending, ${completed} completed)`)
+          ctx.stdout(`Total: ${todos.length} (${pending} pending, ${completed} completed)`)
         }
         break
       }
@@ -163,22 +164,22 @@ export async function todoCommand (args: string[]) {
       case 'done': {
         const id = positionals[1]
         if (!id) {
-          console.error('Error: Todo ID is required')
-          console.error('Usage: githuman todo done <id>')
-          process.exit(1)
+          ctx.stderr('Error: Todo ID is required')
+          ctx.stderr('Usage: githuman todo done <id>')
+          ctx.exit(1)
         }
 
-        const todo = findTodoByPrefix(repo, id)
+        const todo = findTodoByPrefix(repo, id, ctx)
         if (!todo) {
-          console.error(`Error: Todo not found: ${id}`)
-          process.exit(1)
+          ctx.stderr(`Error: Todo not found: ${id}`)
+          ctx.exit(1)
         }
 
         const updated = repo.update(todo.id, { completed: true })
         if (values.json) {
-          console.log(JSON.stringify(updated, null, 2))
+          ctx.stdout(JSON.stringify(updated, null, 2))
         } else {
-          console.log(`Marked as done: ${todo.content}`)
+          ctx.stdout(`Marked as done: ${todo.content}`)
         }
         didMutate = true
         break
@@ -187,22 +188,22 @@ export async function todoCommand (args: string[]) {
       case 'undone': {
         const id = positionals[1]
         if (!id) {
-          console.error('Error: Todo ID is required')
-          console.error('Usage: githuman todo undone <id>')
-          process.exit(1)
+          ctx.stderr('Error: Todo ID is required')
+          ctx.stderr('Usage: githuman todo undone <id>')
+          ctx.exit(1)
         }
 
-        const todo = findTodoByPrefix(repo, id)
+        const todo = findTodoByPrefix(repo, id, ctx)
         if (!todo) {
-          console.error(`Error: Todo not found: ${id}`)
-          process.exit(1)
+          ctx.stderr(`Error: Todo not found: ${id}`)
+          ctx.exit(1)
         }
 
         const updated = repo.update(todo.id, { completed: false })
         if (values.json) {
-          console.log(JSON.stringify(updated, null, 2))
+          ctx.stdout(JSON.stringify(updated, null, 2))
         } else {
-          console.log(`Marked as pending: ${todo.content}`)
+          ctx.stdout(`Marked as pending: ${todo.content}`)
         }
         didMutate = true
         break
@@ -212,28 +213,28 @@ export async function todoCommand (args: string[]) {
         const id = positionals[1]
         const posStr = positionals[2]
         if (!id || posStr === undefined) {
-          console.error('Error: Todo ID and position are required')
-          console.error('Usage: githuman todo move <id> <position>')
-          process.exit(1)
+          ctx.stderr('Error: Todo ID and position are required')
+          ctx.stderr('Usage: githuman todo move <id> <position>')
+          ctx.exit(1)
         }
 
         const position = parseInt(posStr, 10)
         if (Number.isNaN(position) || position < 0) {
-          console.error('Error: Position must be a non-negative integer')
-          process.exit(1)
+          ctx.stderr('Error: Position must be a non-negative integer')
+          ctx.exit(1)
         }
 
-        const todo = findTodoByPrefix(repo, id)
+        const todo = findTodoByPrefix(repo, id, ctx)
         if (!todo) {
-          console.error(`Error: Todo not found: ${id}`)
-          process.exit(1)
+          ctx.stderr(`Error: Todo not found: ${id}`)
+          ctx.exit(1)
         }
 
         const moved = repo.move(todo.id, position)
         if (values.json) {
-          console.log(JSON.stringify(moved, null, 2))
+          ctx.stdout(JSON.stringify(moved, null, 2))
         } else {
-          console.log(`Moved "${todo.content}" to position ${position}`)
+          ctx.stdout(`Moved "${todo.content}" to position ${position}`)
         }
         didMutate = true
         break
@@ -242,22 +243,22 @@ export async function todoCommand (args: string[]) {
       case 'remove': {
         const id = positionals[1]
         if (!id) {
-          console.error('Error: Todo ID is required')
-          console.error('Usage: githuman todo remove <id>')
-          process.exit(1)
+          ctx.stderr('Error: Todo ID is required')
+          ctx.stderr('Usage: githuman todo remove <id>')
+          ctx.exit(1)
         }
 
-        const todo = findTodoByPrefix(repo, id)
+        const todo = findTodoByPrefix(repo, id, ctx)
         if (!todo) {
-          console.error(`Error: Todo not found: ${id}`)
-          process.exit(1)
+          ctx.stderr(`Error: Todo not found: ${id}`)
+          ctx.exit(1)
         }
 
         repo.delete(todo.id)
         if (values.json) {
-          console.log(JSON.stringify({ success: true, id: todo.id }, null, 2))
+          ctx.stdout(JSON.stringify({ success: true, id: todo.id }, null, 2))
         } else {
-          console.log(`Removed: ${todo.content}`)
+          ctx.stdout(`Removed: ${todo.content}`)
         }
         didMutate = true
         break
@@ -267,25 +268,25 @@ export async function todoCommand (args: string[]) {
         if (values.done) {
           const count = repo.deleteCompleted()
           if (values.json) {
-            console.log(JSON.stringify({ deleted: count }, null, 2))
+            ctx.stdout(JSON.stringify({ deleted: count }, null, 2))
           } else {
-            console.log(`Cleared ${count} completed todo${count === 1 ? '' : 's'}`)
+            ctx.stdout(`Cleared ${count} completed todo${count === 1 ? '' : 's'}`)
           }
           if (count > 0) {
             didMutate = true
           }
         } else {
-          console.error('Error: --done flag is required to clear todos')
-          console.error('Usage: githuman todo clear --done')
-          process.exit(1)
+          ctx.stderr('Error: --done flag is required to clear todos')
+          ctx.stderr('Usage: githuman todo clear --done')
+          ctx.exit(1)
         }
         break
       }
 
       default:
-        console.error(`Unknown subcommand: ${subcommand}`)
-        printHelp()
-        process.exit(1)
+        ctx.stderr(`Unknown subcommand: ${subcommand}`)
+        printHelp(ctx)
+        ctx.exit(1)
     }
 
     // Notify server of changes if mutation occurred
@@ -298,13 +299,13 @@ export async function todoCommand (args: string[]) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       if (subcommand === 'list') {
         if (values.json) {
-          console.log('[]')
+          ctx.stdout('[]')
         } else {
-          console.log('No todos found.')
+          ctx.stdout('No todos found.')
         }
       } else {
-        console.error('Error: Database does not exist yet. Run "githuman serve" first.')
-        process.exit(1)
+        ctx.stderr('Error: Database does not exist yet. Run "githuman serve" first.')
+        ctx.exit(1)
       }
     } else {
       throw err
@@ -315,7 +316,7 @@ export async function todoCommand (args: string[]) {
 /**
  * Find a todo by ID prefix (for convenience)
  */
-function findTodoByPrefix (repo: TodoRepository, prefix: string) {
+function findTodoByPrefix (repo: TodoRepository, prefix: string, ctx: CliContext) {
   // First try exact match
   const exact = repo.findById(prefix)
   if (exact) return exact
@@ -327,11 +328,11 @@ function findTodoByPrefix (repo: TodoRepository, prefix: string) {
   if (matches.length === 1) {
     return matches[0]
   } else if (matches.length > 1) {
-    console.error(`Error: Multiple todos match prefix "${prefix}". Be more specific.`)
+    ctx.stderr(`Error: Multiple todos match prefix "${prefix}". Be more specific.`)
     for (const match of matches) {
-      console.error(`  ${match.id.slice(0, 8)}: ${match.content}`)
+      ctx.stderr(`  ${match.id.slice(0, 8)}: ${match.content}`)
     }
-    process.exit(1)
+    ctx.exit(1)
   }
 
   return null

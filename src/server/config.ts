@@ -41,13 +41,14 @@ function findGitRoot (fromPath: string): string | null {
   }
 }
 
-export function createConfig (options: Partial<ServerConfig> = {}): ServerConfig {
+export function createConfig (options: Partial<ServerConfig> & { cwd?: string } = {}): ServerConfig {
   // Priority for repository path:
   // 1. Explicit option
   // 2. Git repo root from cwd
   // 3. Current working directory
-  const gitRoot = findGitRoot(process.cwd())
-  const repositoryPath = options.repositoryPath ?? gitRoot ?? process.cwd()
+  const effectiveCwd = options.cwd ?? process.cwd()
+  const gitRoot = findGitRoot(effectiveCwd)
+  const repositoryPath = options.repositoryPath ?? gitRoot ?? effectiveCwd
 
   // Priority for db path:
   // 1. Explicit option

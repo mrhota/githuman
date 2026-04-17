@@ -1,51 +1,19 @@
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert'
-import { spawn, execSync } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createTestRepo, createTestRepoWithDb } from './test-utils.ts'
-
-const CLI_PATH = join(import.meta.dirname, '../../src/cli/index.ts')
+import { createTestRepo, createTestRepoWithDb, runCliInProcess } from './test-utils.ts'
 
 // Create temp directories for tests
 let tempDir: string
 let todoTempDir: string
 
-interface ExecResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-}
-
-async function runCli (args: string[], options?: { cwd?: string }): Promise<ExecResult> {
-  return new Promise((resolve) => {
-    const child = spawn('node', [CLI_PATH, ...args], {
-      env: { ...process.env },
-      cwd: options?.cwd,
-    })
-
-    let stdout = ''
-    let stderr = ''
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString()
-    })
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
-
-    child.on('close', (exitCode) => {
-      resolve({ stdout, stderr, exitCode })
-    })
-  })
-}
-
 describe('CLI', () => {
   describe('main entry', () => {
     it('should show help with --help flag', async () => {
-      const result = await runCli(['--help'])
+      const result = await runCliInProcess(['--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('GitHuman'))
@@ -55,35 +23,35 @@ describe('CLI', () => {
     })
 
     it('should show help with -h flag', async () => {
-      const result = await runCli(['-h'])
+      const result = await runCliInProcess(['-h'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('GitHuman'))
     })
 
     it('should show version with --version flag', async () => {
-      const result = await runCli(['--version'])
+      const result = await runCliInProcess(['--version'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('githuman v0.1.0'))
     })
 
     it('should show version with -v flag', async () => {
-      const result = await runCli(['-v'])
+      const result = await runCliInProcess(['-v'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('v0.1.0'))
     })
 
     it('should show help when no command provided', async () => {
-      const result = await runCli([])
+      const result = await runCliInProcess([])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage:'))
     })
 
     it('should error on unknown command', async () => {
-      const result = await runCli(['unknown'])
+      const result = await runCliInProcess(['unknown'])
 
       assert.strictEqual(result.exitCode, 1)
       // Message goes to stderr
@@ -93,7 +61,7 @@ describe('CLI', () => {
 
   describe('serve command', () => {
     it('should show help with --help flag', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman serve'))
@@ -105,7 +73,7 @@ describe('CLI', () => {
     })
 
     it('should show help with -h flag', async () => {
-      const result = await runCli(['serve', '-h'])
+      const result = await runCliInProcess(['serve', '-h'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman serve'))
@@ -114,7 +82,7 @@ describe('CLI', () => {
     it('should auto-generate token when --auth is used without value', async () => {
       // Use --no-open and a temp dir so it doesn't actually start the server
       // This test just verifies parsing works - we can't fully start the server in tests
-      const result = await runCli(['serve', '--auth', '--help'])
+      const result = await runCliInProcess(['serve', '--auth', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       // Help should show the optional token syntax
@@ -122,14 +90,14 @@ describe('CLI', () => {
     })
 
     it('should show helpful error when --auth has short token', async () => {
-      const result = await runCli(['serve', '--auth', 'short', '--no-open'])
+      const result = await runCliInProcess(['serve', '--auth', 'short', '--no-open'])
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('at least 32 characters'))
     })
 
     it('should mention auto-generation in help text', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('auto-generate'))
@@ -137,7 +105,7 @@ describe('CLI', () => {
     })
 
     it('should include --no-https in help text', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('--no-https'))
@@ -145,7 +113,7 @@ describe('CLI', () => {
     })
 
     it('should mention HTTPS auto-enable in help text', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('HTTPS auto-enabled'))
@@ -153,7 +121,7 @@ describe('CLI', () => {
     })
 
     it('should include --cert and --key in help text', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('--cert <path>'))
@@ -163,7 +131,7 @@ describe('CLI', () => {
     })
 
     it('should include --https flag in help text', async () => {
-      const result = await runCli(['serve', '--help'])
+      const result = await runCliInProcess(['serve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('--https'))
@@ -171,14 +139,14 @@ describe('CLI', () => {
     })
 
     it('should error when --cert provided without --key', async () => {
-      const result = await runCli(['serve', '--cert', '/path/to/cert.pem', '--no-open'])
+      const result = await runCliInProcess(['serve', '--cert', '/path/to/cert.pem', '--no-open'])
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('--cert and --key must be specified together'))
     })
 
     it('should error when --key provided without --cert', async () => {
-      const result = await runCli(['serve', '--key', '/path/to/key.pem', '--no-open'])
+      const result = await runCliInProcess(['serve', '--key', '/path/to/key.pem', '--no-open'])
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('--cert and --key must be specified together'))
@@ -198,7 +166,7 @@ describe('CLI', () => {
     })
 
     it('should show help with --help flag', async () => {
-      const result = await runCli(['list', '--help'])
+      const result = await runCliInProcess(['list', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman list'))
@@ -207,7 +175,7 @@ describe('CLI', () => {
     })
 
     it('should show help with -h flag', async () => {
-      const result = await runCli(['list', '-h'])
+      const result = await runCliInProcess(['list', '-h'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman list'))
@@ -215,7 +183,7 @@ describe('CLI', () => {
 
     it('should show no reviews message when database does not exist', async () => {
       // Run from temp directory which has no database
-      const result = await runCli(['list'], { cwd: tempDir })
+      const result = await runCliInProcess(['list'], { cwd: tempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(
@@ -225,7 +193,7 @@ describe('CLI', () => {
 
     it('should output empty array with --json when no reviews', async () => {
       // Run from temp directory which has no database
-      const result = await runCli(['list', '--json'], { cwd: tempDir })
+      const result = await runCliInProcess(['list', '--json'], { cwd: tempDir })
 
       assert.strictEqual(result.exitCode, 0)
       // Either empty array or "No reviews found" message
@@ -252,7 +220,7 @@ describe('CLI', () => {
     })
 
     it('should show help with --help flag', async () => {
-      const result = await runCli(['todo', '--help'])
+      const result = await runCliInProcess(['todo', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman todo'))
@@ -263,28 +231,28 @@ describe('CLI', () => {
     })
 
     it('should show help with -h flag', async () => {
-      const result = await runCli(['todo', '-h'])
+      const result = await runCliInProcess(['todo', '-h'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman todo'))
     })
 
     it('should show no todos message when database does not exist', async () => {
-      const result = await runCli(['todo', 'list'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'list'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('No todos found'))
     })
 
     it('should output empty array with --json when no todos', async () => {
-      const result = await runCli(['todo', 'list', '--json'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'list', '--json'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.strictEqual(result.stdout.trim(), '[]')
     })
 
     it('should add a todo', async () => {
-      const result = await runCli(['todo', 'add', 'Test todo item'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'add', 'Test todo item'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Created todo'))
@@ -292,7 +260,7 @@ describe('CLI', () => {
     })
 
     it('should list todos after adding', async () => {
-      const result = await runCli(['todo', 'list'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'list'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Test todo item'))
@@ -300,7 +268,7 @@ describe('CLI', () => {
     })
 
     it('should add todo with --json output', async () => {
-      const result = await runCli(['todo', 'add', 'JSON test todo', '--json'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'add', 'JSON test todo', '--json'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       const data = JSON.parse(result.stdout)
@@ -309,14 +277,14 @@ describe('CLI', () => {
     })
 
     it('should require content for add', async () => {
-      const result = await runCli(['todo', 'add'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'add'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('content is required'))
     })
 
     it('should require --done flag for clear', async () => {
-      const result = await runCli(['todo', 'clear'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'clear'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('--done flag is required'))
@@ -324,19 +292,19 @@ describe('CLI', () => {
 
     it('should show only pending todos by default', async () => {
       // First, add a todo and mark it done
-      const addResult = await runCli(['todo', 'add', 'Pending todo'], { cwd: todoTempDir })
+      const addResult = await runCliInProcess(['todo', 'add', 'Pending todo'], { cwd: todoTempDir })
       assert.strictEqual(addResult.exitCode, 0)
 
-      const addResult2 = await runCli(['todo', 'add', 'Will be completed', '--json'], { cwd: todoTempDir })
+      const addResult2 = await runCliInProcess(['todo', 'add', 'Will be completed', '--json'], { cwd: todoTempDir })
       assert.strictEqual(addResult2.exitCode, 0)
       const todoData = JSON.parse(addResult2.stdout)
       const todoId = todoData.id.slice(0, 8)
 
       // Mark the second one as done
-      await runCli(['todo', 'done', todoId], { cwd: todoTempDir })
+      await runCliInProcess(['todo', 'done', todoId], { cwd: todoTempDir })
 
       // Default list should show pending only
-      const listResult = await runCli(['todo', 'list'], { cwd: todoTempDir })
+      const listResult = await runCliInProcess(['todo', 'list'], { cwd: todoTempDir })
       assert.strictEqual(listResult.exitCode, 0)
       assert.ok(listResult.stdout.includes('Pending todo'))
       // Should NOT show completed ones
@@ -344,7 +312,7 @@ describe('CLI', () => {
     })
 
     it('should show only completed todos with --done', async () => {
-      const result = await runCli(['todo', 'list', '--done'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'list', '--done'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Will be completed'))
@@ -354,7 +322,7 @@ describe('CLI', () => {
     })
 
     it('should show all todos with --all', async () => {
-      const result = await runCli(['todo', 'list', '--all'], { cwd: todoTempDir })
+      const result = await runCliInProcess(['todo', 'list', '--all'], { cwd: todoTempDir })
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Pending todo'))
@@ -365,19 +333,19 @@ describe('CLI', () => {
 
     it('should accept "complete" as alias for "done"', async () => {
       // Add a new todo
-      const addResult = await runCli(['todo', 'add', 'Complete alias test', '--json'], { cwd: todoTempDir })
+      const addResult = await runCliInProcess(['todo', 'add', 'Complete alias test', '--json'], { cwd: todoTempDir })
       assert.strictEqual(addResult.exitCode, 0)
       const todoData = JSON.parse(addResult.stdout)
       const todoId = todoData.id.slice(0, 8)
 
       // Mark it as done using "complete" alias
-      const completeResult = await runCli(['todo', 'complete', todoId], { cwd: todoTempDir })
+      const completeResult = await runCliInProcess(['todo', 'complete', todoId], { cwd: todoTempDir })
       assert.strictEqual(completeResult.exitCode, 0)
       assert.ok(completeResult.stdout.includes('Marked as done'))
       assert.ok(completeResult.stdout.includes('Complete alias test'))
 
       // Verify it's in the done list
-      const listResult = await runCli(['todo', 'list', '--done'], { cwd: todoTempDir })
+      const listResult = await runCliInProcess(['todo', 'list', '--done'], { cwd: todoTempDir })
       assert.strictEqual(listResult.exitCode, 0)
       assert.ok(listResult.stdout.includes('Complete alias test'))
       assert.ok(listResult.stdout.includes('[x]'))
@@ -386,7 +354,7 @@ describe('CLI', () => {
 
   describe('resolve command', () => {
     it('should show help with --help flag', async () => {
-      const result = await runCli(['resolve', '--help'])
+      const result = await runCliInProcess(['resolve', '--help'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman resolve'))
@@ -395,7 +363,7 @@ describe('CLI', () => {
     })
 
     it('should show help with -h flag', async () => {
-      const result = await runCli(['resolve', '-h'])
+      const result = await runCliInProcess(['resolve', '-h'])
 
       assert.strictEqual(result.exitCode, 0)
       assert.ok(result.stdout.includes('Usage: githuman resolve'))
@@ -403,7 +371,7 @@ describe('CLI', () => {
 
     it('should require review-id', async (t) => {
       const resolveTempDir = createTestRepo(t)
-      const result = await runCli(['resolve'], { cwd: resolveTempDir })
+      const result = await runCliInProcess(['resolve'], { cwd: resolveTempDir })
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('review-id is required'))
@@ -411,7 +379,7 @@ describe('CLI', () => {
 
     it('should error when review does not exist', async (t) => {
       const resolveTempDir = await createTestRepoWithDb(t)
-      const result = await runCli(['resolve', 'abc123'], { cwd: resolveTempDir })
+      const result = await runCliInProcess(['resolve', 'abc123'], { cwd: resolveTempDir })
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('Review not found'))
@@ -419,7 +387,7 @@ describe('CLI', () => {
 
     it('should error when no reviews exist for "last"', async (t) => {
       const resolveTempDir = await createTestRepoWithDb(t)
-      const result = await runCli(['resolve', 'last'], { cwd: resolveTempDir })
+      const result = await runCliInProcess(['resolve', 'last'], { cwd: resolveTempDir })
 
       assert.strictEqual(result.exitCode, 1)
       assert.ok(result.stderr.includes('No reviews found'))

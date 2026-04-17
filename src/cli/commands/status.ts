@@ -6,9 +6,10 @@ import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import { TodoRepository } from '../../server/repositories/todo.repo.ts'
+import { type CliContext, systemCliContext } from '../context.ts'
 
-function printHelp () {
-  console.log(`
+function printHelp (ctx: CliContext) {
+  ctx.stdout(`
 Usage: githuman status [options]
 
 Show an overview of reviews and todos in the current repository.
@@ -33,7 +34,7 @@ interface StatusResult {
   };
 }
 
-export async function statusCommand (args: string[]) {
+export async function statusCommand (args: string[], ctx: CliContext = systemCliContext) {
   const { values } = parseArgs({
     args,
     options: {
@@ -43,11 +44,11 @@ export async function statusCommand (args: string[]) {
   })
 
   if (values.help) {
-    printHelp()
-    process.exit(0)
+    printHelp(ctx)
+    ctx.exit(0)
   }
 
-  const config = createConfig()
+  const config = createConfig({ cwd: ctx.cwd() })
 
   try {
     initDatabase(config.dbPath)
@@ -70,39 +71,39 @@ export async function statusCommand (args: string[]) {
     }
 
     if (values.json) {
-      console.log(JSON.stringify(status, null, 2))
+      ctx.stdout(JSON.stringify(status, null, 2))
     } else {
-      console.log('GitHuman Status\n')
+      ctx.stdout('GitHuman Status\n')
 
       // Reviews section
-      console.log('Reviews:')
+      ctx.stdout('Reviews:')
       if (status.reviews.total === 0) {
-        console.log('  No reviews yet')
+        ctx.stdout('  No reviews yet')
       } else {
-        console.log(`  Total: ${status.reviews.total}`)
+        ctx.stdout(`  Total: ${status.reviews.total}`)
         if (status.reviews.inProgress > 0) {
-          console.log(`  [ ] In progress: ${status.reviews.inProgress}`)
+          ctx.stdout(`  [ ] In progress: ${status.reviews.inProgress}`)
         }
         if (status.reviews.approved > 0) {
-          console.log(`  [+] Approved: ${status.reviews.approved}`)
+          ctx.stdout(`  [+] Approved: ${status.reviews.approved}`)
         }
         if (status.reviews.changesRequested > 0) {
-          console.log(`  [!] Changes requested: ${status.reviews.changesRequested}`)
+          ctx.stdout(`  [!] Changes requested: ${status.reviews.changesRequested}`)
         }
-        console.log('  Run "githuman list" for details')
+        ctx.stdout('  Run "githuman list" for details')
       }
 
-      console.log('')
+      ctx.stdout('')
 
       // Todos section
-      console.log('Todos:')
+      ctx.stdout('Todos:')
       if (status.todos.total === 0) {
-        console.log('  No todos yet')
+        ctx.stdout('  No todos yet')
       } else {
-        console.log(`  Total: ${status.todos.total}`)
-        console.log(`  [ ] Pending: ${status.todos.pending}`)
-        console.log(`  [x] Completed: ${status.todos.completed}`)
-        console.log('  Run "githuman todo list" for details')
+        ctx.stdout(`  Total: ${status.todos.total}`)
+        ctx.stdout(`  [ ] Pending: ${status.todos.pending}`)
+        ctx.stdout(`  [x] Completed: ${status.todos.completed}`)
+        ctx.stdout('  Run "githuman todo list" for details')
       }
     }
 
@@ -110,13 +111,13 @@ export async function statusCommand (args: string[]) {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       if (values.json) {
-        console.log(JSON.stringify({
+        ctx.stdout(JSON.stringify({
           reviews: { total: 0, inProgress: 0, approved: 0, changesRequested: 0 },
           todos: { total: 0, pending: 0, completed: 0 },
         }, null, 2))
       } else {
-        console.log('GitHuman Status\n')
-        console.log('No database found. Run "githuman serve" to get started.')
+        ctx.stdout('GitHuman Status\n')
+        ctx.stdout('No database found. Run "githuman serve" to get started.')
       }
     } else {
       throw err
