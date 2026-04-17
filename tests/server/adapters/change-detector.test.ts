@@ -57,11 +57,11 @@ describe('ChangeDetector', () => {
     const git = createGitAdapter(tempDir)
     const { events, bus } = createFakeEventBus()
 
-    const detector = createChangeDetector(git, bus, 50)
+    const detector = createChangeDetector(git, bus, 60_000)
     t.after(async () => { await detector.stop() })
 
     await detector.start()
-    await wait(120)
+    await detector.checkNow()
 
     assert.strictEqual(events.length, 0)
   })
@@ -88,11 +88,12 @@ describe('ChangeDetector', () => {
     const git = createGitAdapter(tempDir)
     const { events, bus } = createFakeEventBus()
 
-    const detector = createChangeDetector(git, bus, 50)
+    const detector = createChangeDetector(git, bus, 60_000)
     t.after(async () => { await detector.stop() })
 
     await detector.start()
-    await wait(200)
+    await detector.checkNow()
+    await detector.checkNow()
 
     assert.strictEqual(events.length, 0)
   })
@@ -102,6 +103,8 @@ describe('ChangeDetector', () => {
     const git = createGitAdapter(tempDir)
     const { events, bus } = createFakeEventBus()
 
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+
     const detector = createChangeDetector(git, bus, 50)
     t.after(async () => { await detector.stop() })
 
@@ -109,7 +112,7 @@ describe('ChangeDetector', () => {
     await detector.stop()
 
     writeFileSync(join(tempDir, 'new-file.txt'), 'hello\n')
-    await wait(200)
+    t.mock.timers.tick(200)
 
     assert.strictEqual(events.length, 0)
   })
@@ -122,11 +125,11 @@ describe('ChangeDetector', () => {
     const git = createGitAdapter(tempDir)
     const { events, bus } = createFakeEventBus()
 
-    const detector = createChangeDetector(git, bus, 50)
+    const detector = createChangeDetector(git, bus, 60_000)
     t.after(async () => { await detector.stop() })
 
     await detector.start()
-    await wait(200)
+    await detector.checkNow()
 
     assert.strictEqual(events.length, 0)
   })
@@ -172,17 +175,20 @@ describe('ChangeDetector', () => {
   })
 
   it('setTimeout chains do not overlap', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
     let concurrency = 0
     let maxConcurrency = 0
     let callCount = 0
+    const gates: Array<() => void> = []
+
     const fakeGit = createFakeGitPort({
-      statusPorcelain: async () => {
+      statusPorcelain: () => {
         concurrency++
         maxConcurrency = Math.max(maxConcurrency, concurrency)
         callCount++
-        await wait(80)
-        concurrency--
-        return `output-${callCount}`
+        return new Promise<string>(resolve => {
+          gates.push(() => { concurrency--; resolve(`output-${callCount}`) })
+        })
       },
     })
     const { bus } = createFakeEventBus()
@@ -190,9 +196,36 @@ describe('ChangeDetector', () => {
     const detector = createChangeDetector(fakeGit, bus, 20)
     t.after(async () => { await detector.stop() })
 
-    await detector.start()
+    // start() calls statusPorcelain for initial capture
+    const startPromise = detector.start()
+    // Resolve the initial gate so start() completes
+    gates[0]()
+    await startPromise
+
+    // Reset counters after initialization
     callCount = 0
-    await wait(400)
+    gates.length = 0
+
+    // Tick past first interval — triggers check, statusPorcelain blocks on gate
+    t.mock.timers.tick(20)
+    assert.strictEqual(callCount, 1)
+
+    // Tick again — should NOT start another check (previous still in-flight)
+    t.mock.timers.tick(20)
+    assert.strictEqual(callCount, 1, 'no overlap — previous check still in-flight')
+
+    // Release first check
+    gates[0]()
+    // Flush microtasks so scheduleNext() runs
+    await new Promise<void>(resolve => process.nextTick(resolve))
+
+    // Now scheduleNext has run, tick to fire next check
+    t.mock.timers.tick(20)
+    assert.strictEqual(callCount, 2)
+
+    // Cleanup
+    gates[1]()
+    await new Promise<void>(resolve => process.nextTick(resolve))
     await detector.stop()
 
     assert.ok(callCount >= 2, `expected multiple calls, got ${callCount}`)
@@ -213,6 +246,30 @@ describe('ChangeDetector', () => {
     await detector.checkNow()
 
     assert.ok(events.length > 0, 'expected event for staged changes')
+    assert.strictEqual(events[0].type, 'files')
+  })
+
+  it('scheduled polling triggers check after interval', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    let callCount = 0
+    const fakeGit = createFakeGitPort({
+      statusPorcelain: async () => {
+        callCount++
+        return `output-${callCount}`
+      },
+    })
+    const { events, bus } = createFakeEventBus()
+
+    const detector = createChangeDetector(fakeGit, bus, 100)
+    t.after(async () => { await detector.stop() })
+
+    await detector.start()
+    assert.strictEqual(callCount, 1, 'initial capture on start')
+
+    t.mock.timers.tick(100)
+    await new Promise<void>(resolve => process.nextTick(resolve))
+    assert.strictEqual(callCount, 2, 'poll fired after interval')
+    assert.strictEqual(events.length, 1, 'emitted event for changed output')
     assert.strictEqual(events[0].type, 'files')
   })
 
