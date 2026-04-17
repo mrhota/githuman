@@ -30,75 +30,10 @@ const { values, positionals } = parseArgs({
 
 const command = positionals[0]
 
-function printHelp () {
-  console.log(`
-GitHuman - Review AI agent code changes before commit
-
-Usage: githuman <command> [options]
-
-Commands:
-  serve          Start the review server and open web interface
-  status         Show overview of reviews and todos
-  list           List all saved reviews for the current repository
-  export         Export a review to markdown
-  resolve        Mark a review as approved and resolve all comments
-  todo           Manage todo items for tracking tasks
-
-Options:
-  -h, --help      Show this help message
-  -v, --version   Show version number
-
-Run 'githuman <command> --help' for command-specific help.
-`)
-}
-
-function printVersion () {
-  console.log('githuman v0.1.0')
-}
-
 if (values.version && !command) {
-  printVersion()
+  console.log('githuman v0.1.0')
   process.exit(0)
 }
 
-if (!command) {
-  printHelp()
-  process.exit(0)
-}
-
-switch (command) {
-  case 'serve': {
-    const { serveCommand } = await import('./commands/serve.ts')
-    await serveCommand(process.argv.slice(3))
-    break
-  }
-  case 'status': {
-    const { statusCommand } = await import('./commands/status.ts')
-    await statusCommand(process.argv.slice(3))
-    break
-  }
-  case 'list': {
-    const { listCommand } = await import('./commands/list.ts')
-    await listCommand(process.argv.slice(3))
-    break
-  }
-  case 'export': {
-    const { exportCommand } = await import('./commands/export.ts')
-    await exportCommand(process.argv.slice(3))
-    break
-  }
-  case 'resolve': {
-    const { resolveCommand } = await import('./commands/resolve.ts')
-    await resolveCommand(process.argv.slice(3))
-    break
-  }
-  case 'todo': {
-    const { todoCommand } = await import('./commands/todo.ts')
-    await todoCommand(process.argv.slice(3))
-    break
-  }
-  default:
-    console.error(`Unknown command: ${command}`)
-    printHelp()
-    process.exit(1)
-}
+const { dispatch } = await import('./dispatch.ts')
+await dispatch(command, process.argv.slice(3))

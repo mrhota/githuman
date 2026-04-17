@@ -9,9 +9,10 @@ import { ExportService } from '../../server/services/export.service.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import { ReviewFileRepository } from '../../server/repositories/review-file.repo.ts'
 import { CommentRepository } from '../../server/repositories/comment.repo.ts'
+import { type CliContext, systemCliContext } from '../context.ts'
 
-function printHelp () {
-  console.log(`
+function printHelp (ctx: CliContext) {
+  ctx.stdout(`
 Usage: githuman export <review-id|last> [options]
 
 Export a review to markdown format.
@@ -27,7 +28,7 @@ Options:
 `)
 }
 
-export async function exportCommand (args: string[]) {
+export async function exportCommand (args: string[], ctx: CliContext = systemCliContext) {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -40,19 +41,19 @@ export async function exportCommand (args: string[]) {
   })
 
   if (values.help) {
-    printHelp()
-    process.exit(0)
+    printHelp(ctx)
+    ctx.exit(0)
   }
 
   let reviewId = positionals[0]
 
   if (!reviewId) {
-    console.error('Error: review-id is required\n')
-    printHelp()
-    process.exit(1)
+    ctx.stderr('Error: review-id is required\n')
+    printHelp(ctx)
+    ctx.exit(1)
   }
 
-  const config = createConfig()
+  const config = createConfig({ cwd: ctx.cwd() })
 
   try {
     initDatabase(config.dbPath)
@@ -63,8 +64,8 @@ export async function exportCommand (args: string[]) {
       const reviewRepo = new ReviewRepository(db)
       const lastId = reviewRepo.findLastId()
       if (!lastId) {
-        console.error('Error: No reviews found')
-        process.exit(1)
+        ctx.stderr('Error: No reviews found')
+        ctx.exit(1)
       }
       reviewId = lastId
     }
@@ -81,22 +82,22 @@ export async function exportCommand (args: string[]) {
     })
 
     if (!markdown) {
-      console.error(`Error: Review not found: ${reviewId}`)
-      process.exit(1)
+      ctx.stderr(`Error: Review not found: ${reviewId}`)
+      ctx.exit(1)
     }
 
     if (values.output) {
       writeFileSync(values.output, markdown, 'utf-8')
-      console.log(`Exported to ${values.output}`)
+      ctx.stdout(`Exported to ${values.output}`)
     } else {
-      console.log(markdown)
+      ctx.stdout(markdown)
     }
 
     closeDatabase()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.error('Error: Database does not exist. No reviews have been created yet.')
-      process.exit(1)
+      ctx.stderr('Error: Database does not exist. No reviews have been created yet.')
+      ctx.exit(1)
     } else {
       throw err
     }

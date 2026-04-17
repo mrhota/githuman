@@ -6,9 +6,10 @@ import { initDatabase, closeDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import type { ReviewStatus } from '../../shared/types.ts'
+import { type CliContext, systemCliContext } from '../context.ts'
 
-function printHelp () {
-  console.log(`
+function printHelp (ctx: CliContext) {
+  ctx.stdout(`
 Usage: githuman list [options]
 
 List all saved reviews for the current repository.
@@ -20,7 +21,7 @@ Options:
 `)
 }
 
-export async function listCommand (args: string[]) {
+export async function listCommand (args: string[], ctx: CliContext = systemCliContext) {
   const { values } = parseArgs({
     args,
     options: {
@@ -31,11 +32,11 @@ export async function listCommand (args: string[]) {
   })
 
   if (values.help) {
-    printHelp()
-    process.exit(0)
+    printHelp(ctx)
+    ctx.exit(0)
   }
 
-  const config = createConfig()
+  const config = createConfig({ cwd: ctx.cwd() })
 
   try {
     const db = initDatabase(config.dbPath)
@@ -50,7 +51,7 @@ export async function listCommand (args: string[]) {
 
     if (values.json) {
       // Output the same shape as before for backwards compatibility
-      console.log(JSON.stringify(reviews.map((r) => ({
+      ctx.stdout(JSON.stringify(reviews.map((r) => ({
         id: r.id,
         source_type: r.sourceType,
         source_ref: r.sourceRef,
@@ -59,9 +60,9 @@ export async function listCommand (args: string[]) {
         updated_at: r.updatedAt,
       })), null, 2))
     } else if (reviews.length === 0) {
-      console.log('No reviews found.')
+      ctx.stdout('No reviews found.')
     } else {
-      console.log('Reviews:\n')
+      ctx.stdout('Reviews:\n')
       for (const review of reviews) {
         const statusIcon =
           review.status === 'approved'
@@ -81,16 +82,16 @@ export async function listCommand (args: string[]) {
           displayName = 'Staged changes'
         }
 
-        console.log(`${statusIcon} ${displayName}`)
-        console.log(`    ID: ${review.id}`)
-        console.log(`    Created: ${review.createdAt}\n`)
+        ctx.stdout(`${statusIcon} ${displayName}`)
+        ctx.stdout(`    ID: ${review.id}`)
+        ctx.stdout(`    Created: ${review.createdAt}\n`)
       }
     }
 
     closeDatabase()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.log('No reviews found. Database does not exist yet.')
+      ctx.stdout('No reviews found. Database does not exist yet.')
     } else {
       throw err
     }

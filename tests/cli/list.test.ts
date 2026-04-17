@@ -3,42 +3,9 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { createTestRepoWithDb } from './test-utils.ts'
-
-const CLI_PATH = join(import.meta.dirname, '../../src/cli/index.ts')
-
-interface ExecResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-}
-
-async function runCli (args: string[], options?: { cwd?: string }): Promise<ExecResult> {
-  return new Promise((resolve) => {
-    const child = spawn('node', [CLI_PATH, ...args], {
-      env: { ...process.env },
-      cwd: options?.cwd,
-    })
-
-    let stdout = ''
-    let stderr = ''
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString()
-    })
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
-
-    child.on('close', (exitCode) => {
-      resolve({ stdout, stderr, exitCode })
-    })
-  })
-}
+import { createTestRepoWithDb, runCliInProcess } from './test-utils.ts'
 
 async function insertReview (dbPath: string, review: {
   id: string;
@@ -90,7 +57,7 @@ describe('CLI list command', () => {
       sourceRef: 'feature-branch',
     })
 
-    const result = await runCli(['list'], { cwd: tempDir })
+    const result = await runCliInProcess(['list'], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     assert.ok(result.stdout.includes('Staged changes'))
@@ -113,7 +80,7 @@ describe('CLI list command', () => {
       sourceRef: 'feature-branch',
     })
 
-    const result = await runCli(['list', '--status', 'approved'], { cwd: tempDir })
+    const result = await runCliInProcess(['list', '--status', 'approved'], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     assert.ok(result.stdout.includes('Branch: feature-branch'))
@@ -131,7 +98,7 @@ describe('CLI list command', () => {
       sourceType: 'staged',
     })
 
-    const result = await runCli(['list', '--json'], { cwd: tempDir })
+    const result = await runCliInProcess(['list', '--json'], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     const data = JSON.parse(result.stdout)

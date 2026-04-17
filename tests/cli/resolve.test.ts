@@ -3,42 +3,9 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { createTestRepoWithDb } from './test-utils.ts'
-
-const CLI_PATH = join(import.meta.dirname, '../../src/cli/index.ts')
-
-interface ExecResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-}
-
-async function runCli (args: string[], options?: { cwd?: string }): Promise<ExecResult> {
-  return new Promise((resolve) => {
-    const child = spawn('node', [CLI_PATH, ...args], {
-      env: { ...process.env },
-      cwd: options?.cwd,
-    })
-
-    let stdout = ''
-    let stderr = ''
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString()
-    })
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
-
-    child.on('close', (exitCode) => {
-      resolve({ stdout, stderr, exitCode })
-    })
-  })
-}
+import { createTestRepoWithDb, runCliInProcess } from './test-utils.ts'
 
 /**
  * Insert a review directly into the database for testing.
@@ -115,7 +82,7 @@ describe('CLI resolve command - state machine enforcement', () => {
 
     await insertReview(dbPath, { id: reviewId, status: 'approved' })
 
-    const result = await runCli(['resolve', reviewId], { cwd: tempDir })
+    const result = await runCliInProcess(['resolve', reviewId], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 1)
     assert.ok(
@@ -133,7 +100,7 @@ describe('CLI resolve command - state machine enforcement', () => {
 
     await insertReview(dbPath, { id: reviewId, status: 'in_progress' })
 
-    const result = await runCli(['resolve', reviewId], { cwd: tempDir })
+    const result = await runCliInProcess(['resolve', reviewId], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     assert.ok(result.stdout.includes('in_progress'))
@@ -147,7 +114,7 @@ describe('CLI resolve command - state machine enforcement', () => {
 
     await insertReview(dbPath, { id: reviewId, status: 'changes_requested' })
 
-    const result = await runCli(['resolve', reviewId], { cwd: tempDir })
+    const result = await runCliInProcess(['resolve', reviewId], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     assert.ok(result.stdout.includes('changes_requested'))
@@ -164,7 +131,7 @@ describe('CLI resolve command - state machine enforcement', () => {
     await insertComment(dbPath, { id: randomUUID(), reviewId, resolved: false })
     await insertComment(dbPath, { id: randomUUID(), reviewId, resolved: true })
 
-    const result = await runCli(['resolve', reviewId, '--json'], { cwd: tempDir })
+    const result = await runCliInProcess(['resolve', reviewId, '--json'], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     const data = JSON.parse(result.stdout)
@@ -183,7 +150,7 @@ describe('CLI resolve command - state machine enforcement', () => {
     // Insert newer review (in_progress)
     await insertReview(dbPath, { id: newId, status: 'in_progress' })
 
-    const result = await runCli(['resolve', 'last'], { cwd: tempDir })
+    const result = await runCliInProcess(['resolve', 'last'], { cwd: tempDir })
 
     assert.strictEqual(result.exitCode, 0)
     assert.ok(result.stdout.includes('approved'))
