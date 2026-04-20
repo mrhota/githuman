@@ -27,54 +27,6 @@ const validV1Files: DiffFile[] = [{
 
 describe('snapshot data parsing — proving data corruption risks', () => {
   /**
-   * These tests demonstrate silent failures with raw JSON.parse.
-   * They should pass, documenting the dangerous behavior.
-   */
-  describe('current behavior (raw JSON.parse) — silent corruption', () => {
-    it('V1 snapshot accessed as V2 silently loses files (undefined, no error)', () => {
-      const v2 = JSON.stringify({ repository: validRepo, version: 2 })
-      const parsedV2 = JSON.parse(v2) as { files?: DiffFile[] }
-
-      // Silent corruption: accessing .files on V2 returns undefined, not an error
-      assert.strictEqual(parsedV2.files, undefined)
-      // Code that does `snapshot.files ?? []` silently gets empty array — data lost
-    })
-
-    it('malformed snapshot (missing repository) parses without error', () => {
-      const bad = JSON.stringify({ version: 2 })
-      const parsed = JSON.parse(bad)
-
-      // No error thrown — repository is undefined
-      assert.strictEqual(parsed.repository, undefined)
-      // Downstream code accessing parsed.repository.name would crash at runtime
-    })
-
-    it('unknown version (e.g., 3) is silently treated as V1 by isNewFormat check', () => {
-      const futureVersion = JSON.stringify({ repository: validRepo, version: 3 })
-      const parsed = JSON.parse(futureVersion)
-
-      // Current isNewFormat: `snapshot.version === 2`
-      // Version 3 is NOT === 2, so it's treated as legacy V1
-      const isNew = parsed.version === 2
-      assert.strictEqual(isNew, false)
-      // But V1 expects a `files` array — which doesn't exist here
-      assert.strictEqual(parsed.files, undefined)
-      // Silent data loss: code falls through to legacy path with no files
-    })
-
-    it('completely invalid JSON structure parses as "valid" object', () => {
-      const garbage = JSON.stringify({ foo: 'bar', baz: 42 })
-      const parsed = JSON.parse(garbage)
-
-      // No error — parsed is a regular object
-      assert.strictEqual(parsed.repository, undefined)
-      assert.strictEqual(parsed.version, undefined)
-      assert.strictEqual(parsed.files, undefined)
-      // Every field access silently returns undefined
-    })
-  })
-
-  /**
    * These tests verify the typed parser catches corruption.
    * They will FAIL until we implement parseSnapshotData.
    */

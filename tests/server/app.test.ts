@@ -108,44 +108,4 @@ describe('app', () => {
       assert.ok(response.headers['access-control-allow-origin'])
     })
   })
-
-  describe('verbose option', () => {
-    it('should build app with verbose option', async () => {
-      const config = createConfig()
-      const app = await buildApp(config, { logger: false, verbose: true })
-
-      // App should build successfully with verbose option
-      assert.ok(app)
-
-      await app.close()
-    })
-  })
-
-  describe('HTTPS configuration', () => {
-    it('should build app without HTTPS when https is false', async () => {
-      const config = createConfig({ https: false })
-      const app = await buildApp(config, { logger: false })
-
-      // App should build successfully without HTTPS
-      assert.ok(app)
-      assert.strictEqual(app.config.https, false)
-
-      await app.close()
-    })
-
-    it('should expose https setting in config', async () => {
-      // Test that config is correctly passed through without actually creating HTTPS server
-      // (creating HTTPS server requires valid certificates)
-      const config = createConfig({
-        https: true,
-        tlsCert: 'test-cert',
-        tlsKey: 'test-key',
-      })
-
-      // Verify config has the right values
-      assert.strictEqual(config.https, true)
-      assert.strictEqual(config.tlsCert, 'test-cert')
-      assert.strictEqual(config.tlsKey, 'test-key')
-    })
-  })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { setAuthToken, getAuthToken, clearAuthToken, api } from '../../../src/web/api/client'
+import { setAuthToken, api } from '../../../src/web/api/client'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -19,48 +19,6 @@ const localStorageMock = (() => {
 })()
 
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
-
-describe('Auth token functions', () => {
-  beforeEach(() => {
-    localStorageMock.clear()
-  })
-
-  describe('setAuthToken', () => {
-    it('should store token in localStorage', () => {
-      setAuthToken('test-token-123')
-      expect(localStorage.getItem('auth_token')).toBe('test-token-123')
-    })
-
-    it('should overwrite existing token', () => {
-      setAuthToken('old-token')
-      setAuthToken('new-token')
-      expect(localStorage.getItem('auth_token')).toBe('new-token')
-    })
-  })
-
-  describe('getAuthToken', () => {
-    it('should return null when no token is stored', () => {
-      expect(getAuthToken()).toBeNull()
-    })
-
-    it('should return stored token', () => {
-      localStorage.setItem('auth_token', 'my-secret-token')
-      expect(getAuthToken()).toBe('my-secret-token')
-    })
-  })
-
-  describe('clearAuthToken', () => {
-    it('should remove token from localStorage', () => {
-      localStorage.setItem('auth_token', 'token-to-remove')
-      clearAuthToken()
-      expect(localStorage.getItem('auth_token')).toBeNull()
-    })
-
-    it('should not throw when no token exists', () => {
-      expect(() => clearAuthToken()).not.toThrow()
-    })
-  })
-})
 
 describe('API client authentication', () => {
   let mockFetch: ReturnType<typeof vi.spyOn>

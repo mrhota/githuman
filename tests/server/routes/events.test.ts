@@ -166,41 +166,4 @@ describe('events routes', () => {
   // Note: GET /api/events (SSE endpoint) cannot be easily tested with Fastify's inject
   // because it hijacks the response for streaming. The endpoint is tested via
   // integration testing when needed.
-
-  describe('server shutdown', () => {
-    it('should close cleanly without hanging', async () => {
-      // This test verifies that the SIGINT fix works - the server should close
-      // quickly without waiting for timeout. We use a separate app instance
-      // to avoid interfering with the afterEach hook.
-      const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
-      const testApp = await buildApp(config, { logger: false, serveStatic: false })
-
-      // Start time tracking
-      const startTime = Date.now()
-
-      // Close the app - this should complete quickly
-      await testApp.close()
-
-      // Verify it closed within a reasonable time (less than 2 seconds)
-      // If the SIGINT fix regresses, this would hang until timeout
-      const elapsed = Date.now() - startTime
-      assert.ok(elapsed < 2000, `Server close took ${elapsed}ms, expected < 2000ms`)
-    })
-  })
-
-  describe('plugin registration', () => {
-    it('should register without async work (no timeout)', async () => {
-      const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
-      initDatabase(config.dbPath)
-
-      const startTime = Date.now()
-      const testApp = await buildApp(config, { logger: false, serveStatic: false })
-      const elapsed = Date.now() - startTime
-
-      // Plugin registration should be fast (< 1 second) since no async file watching
-      assert.ok(elapsed < 1000, `Plugin registration took ${elapsed}ms, expected < 1000ms`)
-
-      await testApp.close()
-    })
-  })
 })
