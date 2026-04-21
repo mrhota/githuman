@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { DatabaseSync } from 'node:sqlite'
 import { TodoRepository } from '../../../src/server/repositories/todo.repo.ts'
@@ -31,7 +31,7 @@ describe('TodoRepository', () => {
     testReviewId = review.id
   })
 
-  after(() => {
+  afterEach(() => {
     db?.close()
   })
 

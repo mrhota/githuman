@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { DatabaseSync } from 'node:sqlite'
 import { migrate, migrations } from '../../../src/server/db/migrations.ts'
@@ -6,19 +6,18 @@ import { migrate, migrations } from '../../../src/server/db/migrations.ts'
 describe('migrations', () => {
   let db: DatabaseSync
 
-  before(() => {
+  beforeEach(() => {
     db = new DatabaseSync(':memory:', {
       enableForeignKeyConstraints: true,
     })
+    migrate(db, migrations)
   })
 
-  after(() => {
+  afterEach(() => {
     db.close()
   })
 
   it('should apply all migrations', () => {
-    migrate(db, migrations)
-
     const stmt = db.prepare('PRAGMA user_version')
     const result = stmt.get() as { user_version: number }
     assert.strictEqual(result.user_version, migrations.length)
@@ -100,26 +99,21 @@ describe('migrations', () => {
   })
 
   it('should cascade delete comments when review is deleted', () => {
-    // Insert a review
     db.prepare(
       "INSERT INTO reviews (id, repository_path, source_type, snapshot_data) VALUES ('r1', '/path', 'staged', '{}')"
     ).run()
 
-    // Insert a comment
     db.prepare(
       "INSERT INTO comments (id, review_id, file_path, content) VALUES ('c1', 'r1', 'test.ts', 'comment')"
     ).run()
 
-    // Verify comment exists
     const commentsBefore = db
       .prepare("SELECT * FROM comments WHERE review_id = 'r1'")
       .all()
     assert.strictEqual(commentsBefore.length, 1)
 
-    // Delete review
     db.prepare("DELETE FROM reviews WHERE id = 'r1'").run()
 
-    // Verify comment is deleted
     const commentsAfter = db
       .prepare("SELECT * FROM comments WHERE review_id = 'r1'")
       .all()

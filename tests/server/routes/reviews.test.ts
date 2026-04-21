@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -18,7 +18,6 @@ function createTempGitRepo (): string {
   execSync('git init', { cwd: tempDir, stdio: 'ignore' })
   execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
   execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-  // Create an initial commit so HEAD exists
   fs.writeFileSync(path.join(tempDir, 'README.md'), '# Test')
   execSync('git add .', { cwd: tempDir, stdio: 'ignore' })
   execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
@@ -30,53 +29,55 @@ function createTempGitRepo (): string {
  */
 function createTempGitRepoWithStagedChanges (): string {
   const tempDir = createTempGitRepo()
-  // Add a new file and stage it
   fs.writeFileSync(path.join(tempDir, 'test-file.ts'), 'const x = 1;\n')
   execSync('git add test-file.ts', { cwd: tempDir, stdio: 'ignore' })
   return tempDir
 }
 
+interface TestEnv {
+  app: FastifyInstance
+  testDbDir: string
+  testRepoDir: string | null
+}
+
+async function buildEnv (opts: { staged?: boolean, nonGit?: boolean, dbPrefix: string }): Promise<TestEnv> {
+  const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), opts.dbPrefix))
+  const dbPath = path.join(testDbDir, 'test.db')
+  let testRepoDir: string | null = null
+  let repositoryPath: string
+  if (opts.nonGit) {
+    repositoryPath = '/tmp'
+  } else {
+    testRepoDir = opts.staged ? createTempGitRepoWithStagedChanges() : createTempGitRepo()
+    repositoryPath = testRepoDir
+  }
+  initDatabase(dbPath)
+  const config = createConfig({ repositoryPath, dbPath, authToken: TEST_TOKEN })
+  const app = await buildApp(config, { logger: false })
+  return { app, testDbDir, testRepoDir }
+}
+
+async function teardownEnv (env: TestEnv): Promise<void> {
+  await env.app.close()
+  closeDatabase()
+  if (env.testDbDir) fs.rmSync(env.testDbDir, { recursive: true, force: true })
+  if (env.testRepoDir) fs.rmSync(env.testRepoDir, { recursive: true, force: true })
+}
+
 describe('review routes', () => {
-  let app: FastifyInstance
-  let testDbDir: string
-  let testRepoDir: string
+  let env: TestEnv
 
-  before(async () => {
-    // Create temp directory for test database
-    testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-test-'))
-    const dbPath = path.join(testDbDir, 'test.db')
-
-    // Create a clean git repo for testing
-    testRepoDir = createTempGitRepo()
-
-    // Initialize database
-    initDatabase(dbPath)
-
-    // Use temp git repo for testing
-    const config = createConfig({
-      repositoryPath: testRepoDir,
-      dbPath,
-      authToken: TEST_TOKEN,
-    })
-    app = await buildApp(config, { logger: false })
+  beforeEach(async () => {
+    env = await buildEnv({ dbPrefix: 'review-test-' })
   })
 
-  after(async () => {
-    await app.close()
-    closeDatabase()
-
-    // Clean up temp directories
-    if (testDbDir) {
-      fs.rmSync(testDbDir, { recursive: true, force: true })
-    }
-    if (testRepoDir) {
-      fs.rmSync(testRepoDir, { recursive: true, force: true })
-    }
+  afterEach(async () => {
+    await teardownEnv(env)
   })
 
   describe('GET /api/reviews', () => {
     it('should return empty list initially', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews',
         headers: authHeader(),
@@ -92,7 +93,7 @@ describe('review routes', () => {
     })
 
     it('should support pagination parameters', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews?page=2&pageSize=10',
         headers: authHeader(),
@@ -108,7 +109,7 @@ describe('review routes', () => {
 
   describe('POST /api/reviews', () => {
     it('should return error when no staged changes', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'POST',
         url: '/api/reviews',
         headers: authHeader(),
@@ -117,7 +118,6 @@ describe('review routes', () => {
         },
       })
 
-      // Expect error since test runs against clean repo
       assert.strictEqual(response.statusCode, 400)
 
       const body = JSON.parse(response.body)
@@ -125,14 +125,13 @@ describe('review routes', () => {
     })
 
     it('should work with empty body (defaults to staged)', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'POST',
         url: '/api/reviews',
         headers: authHeader(),
         payload: {},
       })
 
-      // Without staged changes, returns the NO_STAGED_CHANGES error
       assert.strictEqual(response.statusCode, 400)
       const body = JSON.parse(response.body)
       assert.strictEqual(body.code, 'NO_STAGED_CHANGES')
@@ -141,7 +140,7 @@ describe('review routes', () => {
 
   describe('GET /api/reviews/:id', () => {
     it('should return 404 for non-existent review', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews/non-existent-id',
         headers: authHeader(),
@@ -156,7 +155,7 @@ describe('review routes', () => {
 
   describe('PATCH /api/reviews/:id', () => {
     it('should return 404 for non-existent review', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'PATCH',
         url: '/api/reviews/non-existent-id',
         headers: authHeader(),
@@ -174,7 +173,7 @@ describe('review routes', () => {
 
   describe('DELETE /api/reviews/:id', () => {
     it('should return 404 for non-existent review', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'DELETE',
         url: '/api/reviews/non-existent-id',
         headers: authHeader(),
@@ -187,24 +186,19 @@ describe('review routes', () => {
     })
 
     it('should delete review without Content-Type header', async () => {
-      // This tests the fix for the "Body cannot be empty" error
-      // when Content-Type is set but no body is provided
-      // The client should NOT send Content-Type for DELETE without body
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'DELETE',
         url: '/api/reviews/some-id',
         headers: authHeader(),
-        // Explicitly no payload
       })
 
-      // Should return 404 (not found), not 400 (bad request)
       assert.strictEqual(response.statusCode, 404)
     })
   })
 
   describe('GET /api/reviews/stats', () => {
     it('should return stats structure', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews/stats',
         headers: authHeader(),
@@ -220,20 +214,17 @@ describe('review routes', () => {
     })
 
     it('should return zeros for fresh database', async () => {
-      // With a fresh temp repo and database, stats should be zeros
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews/stats',
         headers: authHeader(),
       })
 
       const body = JSON.parse(response.body)
-      // Verify all values are numbers (could be 0 or higher if tests created reviews)
       assert.strictEqual(typeof body.total, 'number')
       assert.strictEqual(typeof body.inProgress, 'number')
       assert.strictEqual(typeof body.approved, 'number')
       assert.strictEqual(typeof body.changesRequested, 'number')
-      // Sum of statuses should equal total
       assert.strictEqual(
         body.inProgress + body.approved + body.changesRequested,
         body.total
@@ -243,44 +234,30 @@ describe('review routes', () => {
 })
 
 describe('review routes with staged changes', () => {
-  let app: FastifyInstance
-  let testDbDir: string
-  let testRepoDir: string
+  let env: TestEnv
 
-  before(async () => {
-    // Create temp directory for test database
-    testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-test-staged-'))
-    const dbPath = path.join(testDbDir, 'test.db')
+  beforeEach(async () => {
+    env = await buildEnv({ staged: true, dbPrefix: 'review-test-staged-' })
+  })
 
-    // Create a git repo WITH staged changes
-    testRepoDir = createTempGitRepoWithStagedChanges()
+  afterEach(async () => {
+    await teardownEnv(env)
+  })
 
-    // Initialize database
-    initDatabase(dbPath)
-
-    const config = createConfig({
-      repositoryPath: testRepoDir,
-      dbPath,
-      authToken: TEST_TOKEN,
+  async function createReview (): Promise<string> {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'staged' },
     })
-    app = await buildApp(config, { logger: false })
-  })
-
-  after(async () => {
-    await app.close()
-    closeDatabase()
-
-    if (testDbDir) {
-      fs.rmSync(testDbDir, { recursive: true, force: true })
-    }
-    if (testRepoDir) {
-      fs.rmSync(testRepoDir, { recursive: true, force: true })
-    }
-  })
+    assert.strictEqual(response.statusCode, 201, `Expected 201 but got ${response.statusCode}: ${response.body}`)
+    return JSON.parse(response.body).id
+  }
 
   describe('POST /api/reviews', () => {
     it('should create a review from staged changes', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'POST',
         url: '/api/reviews',
         headers: authHeader(),
@@ -299,21 +276,10 @@ describe('review routes with staged changes', () => {
   })
 
   describe('review CRUD operations', () => {
-    let reviewId: string
-
     it('should create a review and get it by ID', async () => {
-      // Create
-      const createResponse = await app.inject({
-        method: 'POST',
-        url: '/api/reviews',
-        headers: authHeader(),
-        payload: { sourceType: 'staged' },
-      })
-      const created = JSON.parse(createResponse.body)
-      reviewId = created.id
+      const reviewId = await createReview()
 
-      // Get by ID
-      const getResponse = await app.inject({
+      const getResponse = await env.app.inject({
         method: 'GET',
         url: `/api/reviews/${reviewId}`,
         headers: authHeader(),
@@ -327,7 +293,9 @@ describe('review routes with staged changes', () => {
     })
 
     it('should update review status to changes_requested', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      const response = await env.app.inject({
         method: 'PATCH',
         url: `/api/reviews/${reviewId}`,
         headers: authHeader(),
@@ -340,7 +308,16 @@ describe('review routes with staged changes', () => {
     })
 
     it('should export review as markdown', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      await env.app.inject({
+        method: 'PATCH',
+        url: `/api/reviews/${reviewId}`,
+        headers: authHeader(),
+        payload: { status: 'changes_requested' },
+      })
+
+      const response = await env.app.inject({
         method: 'GET',
         url: `/api/reviews/${reviewId}/export`,
         headers: authHeader(),
@@ -353,7 +330,9 @@ describe('review routes with staged changes', () => {
     })
 
     it('should update review status to approved', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      const response = await env.app.inject({
         method: 'PATCH',
         url: `/api/reviews/${reviewId}`,
         headers: authHeader(),
@@ -366,7 +345,9 @@ describe('review routes with staged changes', () => {
     })
 
     it('should delete review', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      const response = await env.app.inject({
         method: 'DELETE',
         url: `/api/reviews/${reviewId}`,
         headers: authHeader(),
@@ -376,8 +357,7 @@ describe('review routes with staged changes', () => {
       const body = JSON.parse(response.body)
       assert.strictEqual(body.success, true)
 
-      // Verify it's gone
-      const getResponse = await app.inject({
+      const getResponse = await env.app.inject({
         method: 'GET',
         url: `/api/reviews/${reviewId}`,
         headers: authHeader(),
@@ -387,26 +367,19 @@ describe('review routes with staged changes', () => {
   })
 
   describe('GET /api/reviews/:id/files/hunks', () => {
-    let reviewId: string
-
     it('should return hunks for a file in a review', async () => {
-      // Create a review first
-      const createResponse = await app.inject({
+      const createResponse = await env.app.inject({
         method: 'POST',
         url: '/api/reviews',
         headers: authHeader(),
         payload: { sourceType: 'staged' },
       })
       const created = JSON.parse(createResponse.body)
-      reviewId = created.id
-
-      // Get the file path from the review
       const filePath = created.files[0]?.newPath || 'test-file.ts'
 
-      // Request hunks using query parameter
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
-        url: `/api/reviews/${reviewId}/files/hunks?path=${encodeURIComponent(filePath)}`,
+        url: `/api/reviews/${created.id}/files/hunks?path=${encodeURIComponent(filePath)}`,
         headers: authHeader(),
       })
 
@@ -414,7 +387,6 @@ describe('review routes with staged changes', () => {
       const body = JSON.parse(response.body)
       assert.ok(Array.isArray(body.hunks))
       assert.ok(body.hunks.length > 0, 'Should have at least one hunk')
-      // Verify hunk structure
       const hunk = body.hunks[0]
       assert.ok('oldStart' in hunk)
       assert.ok('newStart' in hunk)
@@ -422,7 +394,7 @@ describe('review routes with staged changes', () => {
     })
 
     it('should return 404 for non-existent review', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews/non-existent-id/files/hunks?path=test.ts',
         headers: authHeader(),
@@ -432,7 +404,9 @@ describe('review routes with staged changes', () => {
     })
 
     it('should return empty hunks for non-existent file', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      const response = await env.app.inject({
         method: 'GET',
         url: `/api/reviews/${reviewId}/files/hunks?path=non-existent-file.ts`,
         headers: authHeader(),
@@ -444,13 +418,14 @@ describe('review routes with staged changes', () => {
     })
 
     it('should handle file paths with slashes', async () => {
-      const response = await app.inject({
+      const reviewId = await createReview()
+
+      const response = await env.app.inject({
         method: 'GET',
         url: `/api/reviews/${reviewId}/files/hunks?path=${encodeURIComponent('src/components/Test.tsx')}`,
         headers: authHeader(),
       })
 
-      // Should not error - just return empty hunks for non-existent path
       assert.strictEqual(response.statusCode, 200)
       const body = JSON.parse(response.body)
       assert.ok(Array.isArray(body.hunks))
@@ -459,32 +434,17 @@ describe('review routes with staged changes', () => {
 
   describe('review filtering and pagination', () => {
     it('should filter reviews by status', async () => {
-      // Create two reviews
-      await app.inject({
-        method: 'POST',
-        url: '/api/reviews',
-        headers: authHeader(),
-        payload: { sourceType: 'staged' },
-      })
+      await createReview()
+      const approvedId = await createReview()
 
-      const createResponse2 = await app.inject({
-        method: 'POST',
-        url: '/api/reviews',
-        headers: authHeader(),
-        payload: { sourceType: 'staged' },
-      })
-      const review2 = JSON.parse(createResponse2.body)
-
-      // Approve one
-      await app.inject({
+      await env.app.inject({
         method: 'PATCH',
-        url: `/api/reviews/${review2.id}`,
+        url: `/api/reviews/${approvedId}`,
         headers: authHeader(),
         payload: { status: 'approved' },
       })
 
-      // Filter by approved
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews?status=approved',
         headers: authHeader(),
@@ -498,7 +458,7 @@ describe('review routes with staged changes', () => {
     })
 
     it('should paginate reviews', async () => {
-      const response = await app.inject({
+      const response = await env.app.inject({
         method: 'GET',
         url: '/api/reviews?page=1&pageSize=5',
         headers: authHeader(),
@@ -514,36 +474,18 @@ describe('review routes with staged changes', () => {
 })
 
 describe('review routes with non-git directory', () => {
-  let app: FastifyInstance
-  let testDbDir: string
+  let env: TestEnv
 
-  before(async () => {
-    // Create temp directory for test database
-    testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-test-nongit-'))
-    const dbPath = path.join(testDbDir, 'test.db')
-
-    // Use a separate database instance for this test
-    initDatabase(dbPath)
-
-    const config = createConfig({
-      repositoryPath: '/tmp', // Not a git repo
-      dbPath,
-      authToken: TEST_TOKEN,
-    })
-    app = await buildApp(config, { logger: false })
+  beforeEach(async () => {
+    env = await buildEnv({ nonGit: true, dbPrefix: 'review-test-nongit-' })
   })
 
-  after(async () => {
-    await app.close()
-    closeDatabase()
-
-    if (testDbDir) {
-      fs.rmSync(testDbDir, { recursive: true, force: true })
-    }
+  afterEach(async () => {
+    await teardownEnv(env)
   })
 
   it('should return error when creating review in non-git directory', async () => {
-    const response = await app.inject({
+    const response = await env.app.inject({
       method: 'POST',
       url: '/api/reviews',
       headers: authHeader(),
