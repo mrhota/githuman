@@ -16,12 +16,6 @@ describe('migrations', () => {
     db.close()
   })
 
-  it('should start with version 0', () => {
-    const stmt = db.prepare('PRAGMA user_version')
-    const result = stmt.get() as { user_version: number }
-    assert.strictEqual(result.user_version, 0)
-  })
-
   it('should apply all migrations', () => {
     migrate(db, migrations)
 

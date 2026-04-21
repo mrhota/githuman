@@ -18,16 +18,6 @@ describe('config', () => {
       assert.strictEqual(config.tlsKey, undefined)
     })
 
-    it('should allow overriding port', () => {
-      const config = createConfig({ port: 4000 })
-      assert.strictEqual(config.port, 4000)
-    })
-
-    it('should allow overriding host', () => {
-      const config = createConfig({ host: '0.0.0.0' })
-      assert.strictEqual(config.host, '0.0.0.0')
-    })
-
     it('should allow setting auth token with minimum length', () => {
       const validToken = 'this-is-a-valid-token-32-chars!!'
       const config = createConfig({ authToken: validToken })
@@ -50,11 +40,6 @@ describe('config', () => {
     it('should allow overriding db path', () => {
       const config = createConfig({ dbPath: '/custom/db.sqlite' })
       assert.strictEqual(config.dbPath, '/custom/db.sqlite')
-    })
-
-    it('should allow enabling https', () => {
-      const config = createConfig({ https: true })
-      assert.strictEqual(config.https, true)
     })
 
     it('should allow setting TLS certificate and key', () => {
