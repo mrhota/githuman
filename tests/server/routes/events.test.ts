@@ -166,4 +166,19 @@ describe('events routes', () => {
   // Note: GET /api/events (SSE endpoint) cannot be easily tested with Fastify's inject
   // because it hijacks the response for streaming. The endpoint is tested via
   // integration testing when needed.
+
+  describe('server shutdown', () => {
+    // Guards against a past SIGINT regression where SSE/change-detector handles
+    // kept the event loop alive, causing `githuman serve` to hang on Ctrl-C.
+    it('should close cleanly without hanging', async () => {
+      const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
+      const testApp = await buildApp(config, { logger: false, serveStatic: false })
+
+      const startTime = Date.now()
+      await testApp.close()
+      const elapsed = Date.now() - startTime
+
+      assert.ok(elapsed < 2000, `Server close took ${elapsed}ms, expected < 2000ms`)
+    })
+  })
 })
