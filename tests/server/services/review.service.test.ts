@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { DatabaseSync } from 'node:sqlite'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -45,7 +45,7 @@ describe('ReviewService', () => {
     fileRepo = new ReviewFileRepository(db)
   })
 
-  after(() => {
+  afterEach(() => {
     db?.close()
   })
 
