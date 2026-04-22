@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -455,6 +456,138 @@ describe('review routes with staged changes', () => {
       assert.strictEqual(body.pageSize, 5)
       assert.ok(body.reviews.length <= 5)
     })
+  })
+})
+
+describe('POST /api/reviews — branch source type', () => {
+  let env: TestEnv
+
+  beforeEach(async () => {
+    env = await buildEnv({ dbPrefix: 'review-branch-test-' })
+
+    // Create a feature branch with a committed change — stay on it so HEAD diverges from main
+    const repoPath = env.app.config.repositoryPath
+    execSync('git checkout -b feature-branch', { cwd: repoPath, stdio: 'ignore' })
+    fs.writeFileSync(path.join(repoPath, 'feature.ts'), 'export const x = 1;\n')
+    execSync('git add feature.ts', { cwd: repoPath, stdio: 'ignore' })
+    execSync('git commit -m "add feature"', { cwd: repoPath, stdio: 'ignore' })
+  })
+
+  afterEach(async () => {
+    await teardownEnv(env)
+  })
+
+  it('should create a review from branch comparison', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'branch', sourceRef: 'main' },
+    })
+
+    assert.strictEqual(response.statusCode, 201, `Expected 201 but got ${response.statusCode}: ${response.body}`)
+
+    const body = JSON.parse(response.body)
+    assert.ok(body.id)
+    assert.strictEqual(body.sourceType, 'branch')
+    assert.strictEqual(body.sourceRef, 'main')
+    assert.strictEqual(body.status, 'in_progress')
+    assert.ok(Array.isArray(body.files))
+  })
+
+  it('should return 400 for nonexistent branch', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'branch', sourceRef: 'nonexistent-branch' },
+    })
+
+    assert.strictEqual(response.statusCode, 400)
+  })
+})
+
+describe('POST /api/reviews — commits source type', () => {
+  let env: TestEnv
+  let commitSha: string
+
+  beforeEach(async () => {
+    env = await buildEnv({ dbPrefix: 'review-commits-test-' })
+
+    // Create a commit to reference
+    const repoPath = env.app.config.repositoryPath
+    fs.writeFileSync(path.join(repoPath, 'committed.ts'), 'export const y = 2;\n')
+    execSync('git add committed.ts', { cwd: repoPath, stdio: 'ignore' })
+    execSync('git commit -m "add committed file"', { cwd: repoPath, stdio: 'ignore' })
+    commitSha = execSync('git rev-parse HEAD', { cwd: repoPath, encoding: 'utf-8' }).trim()
+  })
+
+  afterEach(async () => {
+    await teardownEnv(env)
+  })
+
+  it('should create a review from specific commits', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'commits', sourceRef: commitSha },
+    })
+
+    assert.strictEqual(response.statusCode, 201, `Expected 201 but got ${response.statusCode}: ${response.body}`)
+
+    const body = JSON.parse(response.body)
+    assert.ok(body.id)
+    assert.strictEqual(body.sourceType, 'commits')
+    assert.strictEqual(body.sourceRef, commitSha)
+    assert.strictEqual(body.status, 'in_progress')
+    assert.ok(Array.isArray(body.files))
+    assert.ok(body.files.length > 0)
+  })
+
+  it('should return 400 for invalid commit SHA', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'commits', sourceRef: 'deadbeefdeadbeef' },
+    })
+
+    assert.strictEqual(response.statusCode, 400)
+  })
+})
+
+describe('POST /api/reviews — schema validation', () => {
+  let env: TestEnv
+
+  beforeEach(async () => {
+    env = await buildEnv({ dbPrefix: 'review-schema-test-' })
+  })
+
+  afterEach(async () => {
+    await teardownEnv(env)
+  })
+
+  it('should reject branch source type without sourceRef', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'branch' },
+    })
+
+    assert.strictEqual(response.statusCode, 400)
+  })
+
+  it('should reject commits source type without sourceRef', async () => {
+    const response = await env.app.inject({
+      method: 'POST',
+      url: '/api/reviews',
+      headers: authHeader(),
+      payload: { sourceType: 'commits' },
+    })
+
+    assert.strictEqual(response.statusCode, 400)
   })
 })
 

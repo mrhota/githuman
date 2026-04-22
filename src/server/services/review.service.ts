@@ -106,13 +106,19 @@ export class ReviewService {
       }
       baseRef = await this.git.getHeadSha()
     } else if (sourceType === 'branch' && sourceRef) {
-      // Compare branches
-      diffText = await this.git.getBranchDiff(sourceRef)
+      try {
+        diffText = await this.git.getBranchDiff(sourceRef)
+      } catch {
+        throw new ReviewError(`Invalid branch ref: ${sourceRef}`, 'INVALID_SOURCE')
+      }
       baseRef = await this.git.getHeadSha()
     } else if (sourceType === 'commits' && sourceRef) {
-      // Get diff for specific commits
       const commits = sourceRef.split(',').map(s => s.trim())
-      diffText = await this.git.getCommitsDiff(commits)
+      try {
+        diffText = await this.git.getCommitsDiff(commits)
+      } catch {
+        throw new ReviewError(`Invalid commit ref: ${sourceRef}`, 'INVALID_SOURCE')
+      }
       baseRef = commits[commits.length - 1] || null
     } else {
       throw new ReviewError('Invalid source type or missing source ref', 'INVALID_SOURCE')
