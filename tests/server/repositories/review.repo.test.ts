@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert'
 import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
+import { buildReviewInput } from '../helpers.ts'
 import type { DatabaseSync } from 'node:sqlite'
 
 describe('ReviewRepository', () => {
@@ -15,15 +16,11 @@ describe('ReviewRepository', () => {
 
   describe('create', () => {
     it('should create a review and return it', () => {
-      const review = repo.create({
+      const review = repo.create(buildReviewInput({
         id: 'test-id-1',
         repositoryPath: '/test/repo',
-        baseRef: 'abc123',
-        sourceType: 'staged',
-        sourceRef: null,
         snapshotData: '{"files":[]}',
-        status: 'in_progress',
-      })
+      }))
 
       assert.strictEqual(review.id, 'test-id-1')
       assert.strictEqual(review.repositoryPath, '/test/repo')
@@ -37,30 +34,27 @@ describe('ReviewRepository', () => {
     })
 
     it('should create a review from branch comparison', () => {
-      const review = repo.create({
+      const review = repo.create(buildReviewInput({
         id: 'test-id-2',
         repositoryPath: '/test/repo',
-        baseRef: 'abc123',
         sourceType: 'branch',
         sourceRef: 'main',
         snapshotData: '{}',
-        status: 'in_progress',
-      })
+      }))
 
       assert.strictEqual(review.sourceType, 'branch')
       assert.strictEqual(review.sourceRef, 'main')
     })
 
     it('should create a review from commits', () => {
-      const review = repo.create({
+      const review = repo.create(buildReviewInput({
         id: 'test-id-3',
         repositoryPath: '/test/repo',
         baseRef: null,
         sourceType: 'commits',
         sourceRef: 'abc123,def456',
         snapshotData: '{}',
-        status: 'in_progress',
-      })
+      }))
 
       assert.strictEqual(review.sourceType, 'commits')
       assert.strictEqual(review.sourceRef, 'abc123,def456')
@@ -70,15 +64,12 @@ describe('ReviewRepository', () => {
 
   describe('findById', () => {
     it('should return a review by id', () => {
-      repo.create({
+      repo.create(buildReviewInput({
         id: 'test-id',
         repositoryPath: '/test/repo',
         baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
         snapshotData: '{}',
-        status: 'in_progress',
-      })
+      }))
 
       const review = repo.findById('test-id')
       assert.ok(review)
@@ -100,24 +91,8 @@ describe('ReviewRepository', () => {
     })
 
     it('should return all reviews', () => {
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-2',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'approved',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-2', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}', status: 'approved' }))
 
       const result = repo.findAll()
       assert.strictEqual(result.data.length, 2)
@@ -125,24 +100,8 @@ describe('ReviewRepository', () => {
     })
 
     it('should filter by status', () => {
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-2',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'approved',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-2', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}', status: 'approved' }))
 
       const result = repo.findAll({ status: 'approved' })
       assert.strictEqual(result.data.length, 1)
@@ -151,24 +110,8 @@ describe('ReviewRepository', () => {
     })
 
     it('should filter by repository path', () => {
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/repo/one',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-2',
-        repositoryPath: '/repo/two',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/repo/one', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-2', repositoryPath: '/repo/two', baseRef: null, snapshotData: '{}' }))
 
       const result = repo.findAll({ repositoryPath: '/repo/one' })
       assert.strictEqual(result.data.length, 1)
@@ -176,24 +119,8 @@ describe('ReviewRepository', () => {
     })
 
     it('should filter by source type', () => {
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-2',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'branch',
-        sourceRef: 'main',
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-2', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}', sourceType: 'branch', sourceRef: 'main' }))
 
       const result = repo.findAll({ sourceType: 'branch' })
       assert.strictEqual(result.data.length, 1)
@@ -202,15 +129,7 @@ describe('ReviewRepository', () => {
 
     it('should paginate results', () => {
       for (let i = 1; i <= 5; i++) {
-        repo.create({
-          id: `id-${i}`,
-          repositoryPath: '/test/repo',
-          baseRef: null,
-          sourceType: 'staged',
-          sourceRef: null,
-          snapshotData: '{}',
-          status: 'in_progress',
-        })
+        repo.create(buildReviewInput({ id: `id-${i}`, repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
       }
 
       const page1 = repo.findAll({ page: 1, pageSize: 2 })
@@ -229,15 +148,7 @@ describe('ReviewRepository', () => {
 
   describe('update', () => {
     it('should update review status', () => {
-      repo.create({
-        id: 'test-id',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'test-id', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
 
       const updated = repo.update('test-id', { status: 'approved' })
       assert.ok(updated)
@@ -245,15 +156,7 @@ describe('ReviewRepository', () => {
     })
 
     it('should update to changes_requested status', () => {
-      repo.create({
-        id: 'test-id',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'test-id', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
 
       const updated = repo.update('test-id', { status: 'changes_requested' })
       assert.ok(updated)
@@ -268,15 +171,7 @@ describe('ReviewRepository', () => {
 
   describe('delete', () => {
     it('should delete a review', () => {
-      repo.create({
-        id: 'test-id',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'test-id', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
 
       const deleted = repo.delete('test-id')
       assert.strictEqual(deleted, true)
@@ -293,33 +188,9 @@ describe('ReviewRepository', () => {
 
   describe('countByStatus', () => {
     it('should count reviews by status', () => {
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-2',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
-      repo.create({
-        id: 'id-3',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'approved',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-2', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
+      repo.create(buildReviewInput({ id: 'id-3', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}', status: 'approved' }))
 
       assert.strictEqual(repo.countByStatus('in_progress'), 2)
       assert.strictEqual(repo.countByStatus('approved'), 1)
@@ -331,15 +202,7 @@ describe('ReviewRepository', () => {
     it('should count all reviews', () => {
       assert.strictEqual(repo.countAll(), 0)
 
-      repo.create({
-        id: 'id-1',
-        repositoryPath: '/test/repo',
-        baseRef: null,
-        sourceType: 'staged',
-        sourceRef: null,
-        snapshotData: '{}',
-        status: 'in_progress',
-      })
+      repo.create(buildReviewInput({ id: 'id-1', repositoryPath: '/test/repo', baseRef: null, snapshotData: '{}' }))
 
       assert.strictEqual(repo.countAll(), 1)
     })

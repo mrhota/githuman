@@ -1,9 +1,10 @@
-import { describe, it, beforeEach, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
-import { migrate, migrations } from '../../../src/server/db/migrations.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
+import { buildReviewInput } from '../helpers.ts'
 
 describe('ReviewFileRepository', () => {
   let db: DatabaseSync
@@ -12,26 +13,18 @@ describe('ReviewFileRepository', () => {
   let testReviewId: string
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    migrate(db, migrations)
+    db = createTestDatabase()
     repo = new ReviewFileRepository(db)
     reviewRepo = new ReviewRepository(db)
 
-    // Create a test review to attach files to
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: '/test/path',
-      baseRef: 'abc123',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData: '{}',
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 
-  after(() => {
+  afterEach(() => {
     db?.close()
   })
 

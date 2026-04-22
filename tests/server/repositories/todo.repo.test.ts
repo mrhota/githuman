@@ -1,9 +1,10 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { TodoRepository } from '../../../src/server/repositories/todo.repo.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
-import { migrate, migrations } from '../../../src/server/db/migrations.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
+import { buildReviewInput } from '../helpers.ts'
 
 describe('TodoRepository', () => {
   let db: DatabaseSync
@@ -12,22 +13,14 @@ describe('TodoRepository', () => {
   let testReviewId: string
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    migrate(db, migrations)
+    db = createTestDatabase()
     repo = new TodoRepository(db)
     reviewRepo = new ReviewRepository(db)
 
-    // Create a test review to link todos to
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: '/test/path',
-      baseRef: 'abc123',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData: '{}',
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 

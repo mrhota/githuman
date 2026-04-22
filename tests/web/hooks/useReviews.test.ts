@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useReviewsList, useReview, useCreateReview, useUpdateReview } from '../../../src/web/hooks/useReviews'
+import { spyOnFetch, jsonResponse, type MockFetch } from '../helpers'
 
 describe('useReviewsList', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -14,9 +15,7 @@ describe('useReviewsList', () => {
   })
 
   it('should start with loading state', () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ reviews: [], total: 0, page: 1, pageSize: 20 }), { status: 200 })
-    )
+    mockFetch.mockResolvedValue(jsonResponse({ reviews: [], total: 0, page: 1, pageSize: 20 }))
     const { result } = renderHook(() => useReviewsList())
     expect(result.current.loading).toBe(true)
     expect(result.current.data).toBeNull()
@@ -29,7 +28,7 @@ describe('useReviewsList', () => {
       page: 1,
       pageSize: 20,
     }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(response))
 
     const { result } = renderHook(() => useReviewsList())
 
@@ -42,7 +41,7 @@ describe('useReviewsList', () => {
   })
 
   it('should handle errors', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ error: 'Server error' }), { status: 500 }))
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'Server error' }, 500))
 
     const { result } = renderHook(() => useReviewsList())
 
@@ -55,10 +54,10 @@ describe('useReviewsList', () => {
 })
 
 describe('useReview', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -67,7 +66,7 @@ describe('useReview', () => {
 
   it('should load a single review', async () => {
     const review = { id: 'r1', status: 'in_progress', files: [], summary: {} }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(review), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(review))
 
     const { result } = renderHook(() => useReview('r1'))
 
@@ -79,9 +78,7 @@ describe('useReview', () => {
   })
 
   it('should handle 404 errors', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ error: 'Review not found' }), { status: 404 })
-    )
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'Review not found' }, 404))
 
     const { result } = renderHook(() => useReview('nonexistent'))
 
@@ -95,10 +92,10 @@ describe('useReview', () => {
 })
 
 describe('useCreateReview', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -107,7 +104,7 @@ describe('useCreateReview', () => {
 
   it('should create a review', async () => {
     const newReview = { id: 'r1', status: 'in_progress' }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(newReview), { status: 201 }))
+    mockFetch.mockResolvedValue(jsonResponse(newReview, 201))
 
     const { result } = renderHook(() => useCreateReview())
 
@@ -121,9 +118,7 @@ describe('useCreateReview', () => {
   })
 
   it('should set error on failure', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ error: 'No staged changes' }), { status: 400 })
-    )
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'No staged changes' }, 400))
 
     const { result } = renderHook(() => useCreateReview())
 
@@ -140,10 +135,10 @@ describe('useCreateReview', () => {
 })
 
 describe('useUpdateReview', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -152,7 +147,7 @@ describe('useUpdateReview', () => {
 
   it('should update a review status', async () => {
     const updated = { id: 'r1', status: 'approved' }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(updated), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(updated))
 
     const { result } = renderHook(() => useUpdateReview())
 

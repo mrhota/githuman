@@ -6,18 +6,11 @@ import { CommentRepository } from '../../../src/server/repositories/comment.repo
 import { CommentService, CommentError } from '../../../src/server/services/comment.service.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import { randomUUID } from 'node:crypto'
+import { buildReviewInput } from '../helpers.ts'
 
 function createReview (reviewRepo: ReviewRepository): string {
   const id = randomUUID()
-  reviewRepo.create({
-    id,
-    repositoryPath: '/tmp/test-repo',
-    baseRef: 'abc123',
-    sourceType: 'staged',
-    sourceRef: null,
-    snapshotData: JSON.stringify({ repository: { name: 'test', branch: 'main', remote: null, path: '/tmp/test-repo' }, version: 2 }),
-    status: 'in_progress',
-  })
+  reviewRepo.create(buildReviewInput({ id }))
   return id
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useAuth } from '../../../src/web/hooks/useAuth'
+import { spyOnFetch, jsonResponse, type MockFetch } from '../helpers'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -22,11 +23,11 @@ const localStorageMock = (() => {
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 
 describe('useAuth', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
     localStorageMock.clear()
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -36,7 +37,7 @@ describe('useAuth', () => {
 
   it('should start with loading state', () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ status: 'ok', authRequired: false }), { status: 200 })
+      jsonResponse({ status: 'ok', authRequired: false })
     )
 
     const { result } = renderHook(() => useAuth())
@@ -46,7 +47,7 @@ describe('useAuth', () => {
 
   it('should set isAuthenticated to true when auth is not required', async () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ status: 'ok', authRequired: false }), { status: 200 })
+      jsonResponse({ status: 'ok', authRequired: false })
     )
 
     const { result } = renderHook(() => useAuth())
@@ -61,7 +62,7 @@ describe('useAuth', () => {
 
   it('should set isAuthenticated to false when auth is required and no token', async () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+      jsonResponse({ status: 'ok', authRequired: true })
     )
 
     const { result } = renderHook(() => useAuth())
@@ -79,10 +80,10 @@ describe('useAuth', () => {
 
     mockFetch
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+        jsonResponse({ status: 'ok', authRequired: true })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ name: 'repo' }), { status: 200 })
+        jsonResponse({ name: 'repo' })
       )
 
     const { result } = renderHook(() => useAuth())
@@ -100,10 +101,10 @@ describe('useAuth', () => {
 
     mockFetch
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+        jsonResponse({ status: 'ok', authRequired: true })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+        jsonResponse({ error: 'Unauthorized' }, 401)
       )
 
     const { result } = renderHook(() => useAuth())
@@ -122,10 +123,10 @@ describe('useAuth', () => {
     it('should store token and set isAuthenticated on successful login', async () => {
       mockFetch
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+          jsonResponse({ status: 'ok', authRequired: true })
         )
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ name: 'repo' }), { status: 200 })
+          jsonResponse({ name: 'repo' })
         )
 
       const { result } = renderHook(() => useAuth())
@@ -147,10 +148,10 @@ describe('useAuth', () => {
     it('should return false and show error on failed login', async () => {
       mockFetch
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+          jsonResponse({ status: 'ok', authRequired: true })
         )
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          jsonResponse({ error: 'Unauthorized' }, 401)
         )
 
       const { result } = renderHook(() => useAuth())
@@ -176,10 +177,10 @@ describe('useAuth', () => {
 
       mockFetch
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ status: 'ok', authRequired: true }), { status: 200 })
+          jsonResponse({ status: 'ok', authRequired: true })
         )
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ name: 'repo' }), { status: 200 })
+          jsonResponse({ name: 'repo' })
         )
 
       const { result } = renderHook(() => useAuth())

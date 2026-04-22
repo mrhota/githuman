@@ -11,26 +11,14 @@ import assert from 'node:assert'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { execSync } from 'node:child_process'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 import { createChangeDetector } from '../../../src/server/adapters/change-detector.ts'
 import { createEventBus } from '../../../src/server/adapters/event-bus.ts'
 import type { EventType } from '../../../src/server/ports.ts'
-
-interface TestContext {
-  after: (fn: () => void | Promise<void>) => void
-}
+import { createTestRepo, type TestContext } from '../helpers.ts'
 
 function createTestRepoWithCommit (t: TestContext): string {
-  const tempDir = mkdtempSync(join(tmpdir(), 'integration-change-detect-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-  writeFileSync(join(tempDir, 'README.md'), '# Test\n')
-  execSync('git add README.md', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
-  t.after(() => rmSync(tempDir, { recursive: true, force: true }))
-  return tempDir
+  return createTestRepo(t, { prefix: 'integration-change-detect-' })
 }
 
 describe('Change Detection Integration', () => {
