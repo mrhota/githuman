@@ -6,7 +6,7 @@ import { initDatabase, closeDatabase, getDatabase } from '../../../src/server/db
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { TodoRepository } from '../../../src/server/repositories/todo.repo.ts'
 import type { FastifyInstance } from 'fastify'
-import { TEST_TOKEN, authHeader } from '../helpers.ts'
+import { TEST_TOKEN, authHeader, buildReviewInput } from '../helpers.ts'
 
 describe('todo routes', () => {
   let app: FastifyInstance
@@ -20,15 +20,10 @@ describe('todo routes', () => {
     // Create a test review for linking todos
     const db = getDatabase()
     const reviewRepo = new ReviewRepository(db)
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: process.cwd(),
-      baseRef: 'abc123',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData: JSON.stringify({ files: [], repository: { name: 'test', branch: 'main', remote: null, path: process.cwd() } }),
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 

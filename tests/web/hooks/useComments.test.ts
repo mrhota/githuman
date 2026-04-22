@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useComments, useCommentStats, useCreateComment, useResolveComment, useDeleteComment } from '../../../src/web/hooks/useComments'
+import { spyOnFetch, jsonResponse, type MockFetch } from '../helpers'
 
 describe('useComments', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -14,7 +15,7 @@ describe('useComments', () => {
   })
 
   it('should start with loading state', () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse([]))
     const { result } = renderHook(() => useComments('review-1'))
     expect(result.current.loading).toBe(true)
     expect(result.current.comments).toEqual([])
@@ -24,7 +25,7 @@ describe('useComments', () => {
     const comments = [
       { id: 'c1', reviewId: 'r1', filePath: 'a.ts', content: 'test', resolved: false },
     ]
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(comments), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(comments))
 
     const { result } = renderHook(() => useComments('r1'))
 
@@ -37,7 +38,7 @@ describe('useComments', () => {
   })
 
   it('should handle fetch errors', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }))
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'Not found' }, 404))
 
     const { result } = renderHook(() => useComments('bad-id'))
 
@@ -50,7 +51,7 @@ describe('useComments', () => {
   })
 
   it('should not fetch when reviewId is empty', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse([]))
     const callsBefore = mockFetch.mock.calls.length
     renderHook(() => useComments(''))
 
@@ -61,10 +62,10 @@ describe('useComments', () => {
 })
 
 describe('useCommentStats', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -73,7 +74,7 @@ describe('useCommentStats', () => {
 
   it('should load comment stats', async () => {
     const stats = { total: 5, resolved: 2, unresolved: 3, withSuggestions: 1 }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(stats), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(stats))
 
     const { result } = renderHook(() => useCommentStats('r1'))
 
@@ -86,10 +87,10 @@ describe('useCommentStats', () => {
 })
 
 describe('useCreateComment', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -98,7 +99,7 @@ describe('useCreateComment', () => {
 
   it('should create a comment and return it', async () => {
     const newComment = { id: 'c1', reviewId: 'r1', filePath: 'a.ts', content: 'looks good' }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(newComment), { status: 201 }))
+    mockFetch.mockResolvedValue(jsonResponse(newComment, 201))
 
     const { result } = renderHook(() => useCreateComment())
 
@@ -114,7 +115,7 @@ describe('useCreateComment', () => {
   })
 
   it('should set error on failure', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ error: 'Bad request' }), { status: 400 }))
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'Bad request' }, 400))
 
     const { result } = renderHook(() => useCreateComment())
 
@@ -131,10 +132,10 @@ describe('useCreateComment', () => {
 })
 
 describe('useResolveComment', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -143,7 +144,7 @@ describe('useResolveComment', () => {
 
   it('should resolve a comment', async () => {
     const resolved = { id: 'c1', resolved: true }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(resolved), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(resolved))
 
     const { result } = renderHook(() => useResolveComment())
 
@@ -157,7 +158,7 @@ describe('useResolveComment', () => {
 
   it('should unresolve a comment', async () => {
     const unresolved = { id: 'c1', resolved: false }
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(unresolved), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse(unresolved))
 
     const { result } = renderHook(() => useResolveComment())
 
@@ -171,10 +172,10 @@ describe('useResolveComment', () => {
 })
 
 describe('useDeleteComment', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
-    mockFetch = vi.spyOn(globalThis, 'fetch')
+    mockFetch = spyOnFetch()
   })
 
   afterEach(() => {
@@ -182,7 +183,7 @@ describe('useDeleteComment', () => {
   })
 
   it('should delete a comment', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }))
+    mockFetch.mockResolvedValue(jsonResponse({ success: true }))
 
     const { result } = renderHook(() => useDeleteComment())
 

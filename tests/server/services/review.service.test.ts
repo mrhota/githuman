@@ -1,8 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { DatabaseSync } from 'node:sqlite'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import type { DatabaseSync } from 'node:sqlite'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { ReviewService, ReviewError } from '../../../src/server/services/review.service.ts'
@@ -10,28 +9,11 @@ import { ReviewFileRepository } from '../../../src/server/repositories/review-fi
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { GitService } from '../../../src/server/services/git.service.ts'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
-import { migrate, migrations } from '../../../src/server/db/migrations.ts'
-
-interface TestContext {
-  after: (fn: () => void) => void;
-}
+import { createTestDatabase } from '../../../src/server/db/index.ts'
+import { createTestRepo as createSharedTestRepo, type TestContext, buildReviewInput } from '../helpers.ts'
 
 function createTestRepo (t: TestContext): string {
-  const tempDir = mkdtempSync(join(tmpdir(), 'review-service-test-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-
-  // Create initial commit
-  writeFileSync(join(tempDir, 'README.md'), '# Test\n')
-  execSync('git add README.md', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
-
-  t.after(() => {
-    rmSync(tempDir, { recursive: true, force: true })
-  })
-
-  return tempDir
+  return createSharedTestRepo(t, { prefix: 'review-service-test-' })
 }
 
 describe('ReviewService', () => {
@@ -39,9 +21,7 @@ describe('ReviewService', () => {
   let fileRepo: ReviewFileRepository
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    migrate(db, migrations)
+    db = createTestDatabase()
     fileRepo = new ReviewFileRepository(db)
   })
 
@@ -324,15 +304,11 @@ describe('ReviewService', () => {
         },
       })
 
-      reviewRepo.create({
+      reviewRepo.create(buildReviewInput({
         id: 'legacy-review-1',
         repositoryPath: tempDir,
-        baseRef: 'abc123',
-        sourceType: 'staged',
-        sourceRef: null,
         snapshotData: legacySnapshotData,
-        status: 'in_progress',
-      })
+      }))
 
       const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(createGitAdapter(tempDir), tempDir))
 
@@ -380,15 +356,11 @@ describe('ReviewService', () => {
         },
       })
 
-      reviewRepo.create({
+      reviewRepo.create(buildReviewInput({
         id: 'legacy-review-2',
         repositoryPath: tempDir,
-        baseRef: 'abc123',
-        sourceType: 'staged',
-        sourceRef: null,
         snapshotData: legacySnapshotData,
-        status: 'in_progress',
-      })
+      }))
 
       const service = new ReviewService(new ReviewRepository(db), new ReviewFileRepository(db), new GitService(createGitAdapter(tempDir), tempDir))
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setAuthToken, api } from '../../../src/web/api/client'
+import { spyOnFetch, jsonResponse, type MockFetch } from '../helpers'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -21,13 +22,11 @@ const localStorageMock = (() => {
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 
 describe('API client authentication', () => {
-  let mockFetch: ReturnType<typeof vi.spyOn>
+  let mockFetch: MockFetch
 
   beforeEach(() => {
     localStorageMock.clear()
-    mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ data: 'test' }), { status: 200 })
-    )
+    mockFetch = spyOnFetch().mockResolvedValue(jsonResponse({ data: 'test' }))
   })
 
   afterEach(() => {

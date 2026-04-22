@@ -7,6 +7,7 @@ import { ReviewFileRepository } from '../../../src/server/repositories/review-fi
 import { GitService } from '../../../src/server/services/git.service.ts'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 import type { ReviewStatus } from '../../../src/shared/types.ts'
+import { buildReviewInput } from '../helpers.ts'
 
 /**
  * Tests for review status transition validation.
@@ -21,18 +22,7 @@ import type { ReviewStatus } from '../../../src/shared/types.ts'
 
 function createReview (repo: ReviewRepository, status: ReviewStatus = 'in_progress'): string {
   const id = randomUUID()
-  repo.create({
-    id,
-    repositoryPath: '/tmp/test-repo',
-    baseRef: 'abc123',
-    sourceType: 'staged',
-    sourceRef: null,
-    snapshotData: JSON.stringify({
-      repository: { name: 'test', branch: 'main', remote: null, path: '/tmp/test-repo' },
-      version: 2,
-    }),
-    status,
-  })
+  repo.create(buildReviewInput({ id, status }))
   return id
 }
 

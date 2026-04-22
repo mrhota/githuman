@@ -1,11 +1,12 @@
 import { describe, it, beforeEach, after } from 'node:test'
 import assert from 'node:assert'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { ExportService } from '../../../src/server/services/export.service.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { ReviewFileRepository } from '../../../src/server/repositories/review-file.repo.ts'
 import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
-import { migrate, migrations } from '../../../src/server/db/migrations.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
+import { buildReviewInput, buildCommentInput } from '../helpers.ts'
 
 describe('ExportService', () => {
   let db: DatabaseSync
@@ -15,9 +16,7 @@ describe('ExportService', () => {
   let testReviewId: string
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    migrate(db, migrations)
+    db = createTestDatabase()
     reviewRepo = new ReviewRepository(db)
     const fileRepo = new ReviewFileRepository(db)
     commentRepo = new CommentRepository(db)
@@ -57,15 +56,11 @@ describe('ExportService', () => {
       },
     })
 
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: '/path/to/repo',
       baseRef: 'abc123def456',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData,
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 
@@ -92,16 +87,10 @@ describe('ExportService', () => {
     })
 
     it('should export a review with comments', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Consider using a constant here',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId)
 
@@ -113,16 +102,11 @@ describe('ExportService', () => {
     })
 
     it('should include resolved badge for resolved comments', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Fixed this',
-        suggestion: null,
         resolved: true,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId)
 
@@ -131,16 +115,11 @@ describe('ExportService', () => {
     })
 
     it('should include suggestion code blocks', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Use this instead',
         suggestion: 'const b = 42;',
-        resolved: false,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId)
 
@@ -150,27 +129,17 @@ describe('ExportService', () => {
     })
 
     it('should exclude resolved comments when includeResolved is false', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Resolved comment',
-        suggestion: null,
         resolved: true,
-      })
+      }))
 
-      commentRepo.create({
-        id: 'comment-2',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
+        id: 'test-comment-2',
         lineNumber: 3,
-        lineType: 'added',
         content: 'Unresolved comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId, {
         includeResolved: false,
@@ -183,16 +152,10 @@ describe('ExportService', () => {
     })
 
     it('should include diff snippets by default', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Comment on this line',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId)
 
@@ -202,16 +165,10 @@ describe('ExportService', () => {
     })
 
     it('should exclude diff snippets when includeDiffSnippets is false', () => {
-      commentRepo.create({
-        id: 'comment-1',
-        reviewId: testReviewId,
-        filePath: 'src/index.ts',
+      commentRepo.create(buildCommentInput({
         lineNumber: 2,
-        lineType: 'added',
         content: 'Comment on this line',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(testReviewId, {
         includeDiffSnippets: false,
@@ -264,15 +221,14 @@ describe('ExportService', () => {
         },
       })
 
-      const branchReview = reviewRepo.create({
+      const branchReview = reviewRepo.create(buildReviewInput({
         id: 'branch-review-1',
         repositoryPath: '/path/to/repo',
         baseRef: 'def456abc789',
         sourceType: 'branch',
         sourceRef: 'feature/api',
         snapshotData: branchSnapshotData,
-        status: 'in_progress',
-      })
+      }))
 
       const markdown = exportService.exportToMarkdown(branchReview.id)
 

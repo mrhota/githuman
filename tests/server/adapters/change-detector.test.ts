@@ -6,45 +6,10 @@ import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { createGitAdapter } from '../../../src/server/adapters/git.ts'
 import { createChangeDetector } from '../../../src/server/adapters/change-detector.ts'
-import { createFakeGitPort } from '../helpers.ts'
-import type { EventBus } from '../../../src/server/ports.ts'
-
-interface TestContext {
-  after: (fn: () => void) => void
-}
-
-function createTestRepo (t: TestContext): string {
-  const tempDir = mkdtempSync(join(tmpdir(), 'change-detector-test-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-
-  t.after(() => {
-    rmSync(tempDir, { recursive: true, force: true })
-  })
-
-  return tempDir
-}
+import { createFakeEventBus, createFakeGitPort, createTestRepo, type TestContext } from '../helpers.ts'
 
 function createTestRepoWithCommit (t: TestContext): string {
-  const tempDir = createTestRepo(t)
-  writeFileSync(join(tempDir, 'README.md'), '# Test\n')
-  execSync('git add README.md', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
-  return tempDir
-}
-
-function createFakeEventBus () {
-  const events: Array<{ type: string; data: unknown }> = []
-  return {
-    events,
-    bus: {
-      async emit (type: string, data?: unknown) { events.push({ type, data }) },
-      on () {},
-      removeListener () {},
-      async close () {},
-    } satisfies EventBus,
-  }
+  return createTestRepo(t, { prefix: 'change-detector-test-' })
 }
 
 function wait (ms: number): Promise<void> {

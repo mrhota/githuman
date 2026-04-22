@@ -1,12 +1,12 @@
 /**
  * Shared utilities for CLI tests
  */
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { execSync } from 'node:child_process'
 import { dispatch } from '../../src/cli/dispatch.ts'
 import { createTestCliContext, CliExitError } from '../../src/cli/context.ts'
+import { createTestRepo as createSharedTestRepo, type TestContext } from '../server/helpers.ts'
+
+export type { TestContext }
 
 export interface ExecResult {
   stdout: string;
@@ -14,25 +14,12 @@ export interface ExecResult {
   exitCode: number;
 }
 
-export interface TestContext {
-  after: (fn: () => void) => void;
-}
-
 /**
  * Creates a temporary git repository for testing.
  * Automatically cleans up after the test.
  */
 export function createTestRepo (t: TestContext): string {
-  const tempDir = mkdtempSync(join(tmpdir(), 'cli-test-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-
-  t.after(() => {
-    rmSync(tempDir, { recursive: true, force: true })
-  })
-
-  return tempDir
+  return createSharedTestRepo(t, { prefix: 'cli-test-', initialCommit: false })
 }
 
 /**

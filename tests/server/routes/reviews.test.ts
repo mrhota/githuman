@@ -1,6 +1,5 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,60 +7,46 @@ import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
 import { initDatabase, closeDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
-import { TEST_TOKEN, authHeader } from '../helpers.ts'
+import { TEST_TOKEN, authHeader, createTestRepo, type TestContext } from '../helpers.ts'
 
-/**
- * Create a temporary git repository with no staged changes
- */
-function createTempGitRepo (): string {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-test-'))
-  execSync('git init', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'ignore' })
-  fs.writeFileSync(path.join(tempDir, 'README.md'), '# Test')
-  execSync('git add .', { cwd: tempDir, stdio: 'ignore' })
-  execSync('git commit -m "Initial commit"', { cwd: tempDir, stdio: 'ignore' })
-  return tempDir
-}
-
-/**
- * Create a temporary git repository WITH staged changes
- */
-function createTempGitRepoWithStagedChanges (): string {
-  const tempDir = createTempGitRepo()
-  fs.writeFileSync(path.join(tempDir, 'test-file.ts'), 'const x = 1;\n')
-  execSync('git add test-file.ts', { cwd: tempDir, stdio: 'ignore' })
-  return tempDir
+function makeRepoTestContext (): { t: TestContext, cleanup: () => void } {
+  const cleanups: Array<() => void | Promise<void>> = []
+  return {
+    t: { after: (fn) => { cleanups.push(fn) } },
+    cleanup: () => {
+      for (const fn of cleanups) fn()
+    },
+  }
 }
 
 interface TestEnv {
   app: FastifyInstance
   testDbDir: string
-  testRepoDir: string | null
+  cleanupRepo: () => void
 }
 
 async function buildEnv (opts: { staged?: boolean, nonGit?: boolean, dbPrefix: string }): Promise<TestEnv> {
   const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), opts.dbPrefix))
   const dbPath = path.join(testDbDir, 'test.db')
-  let testRepoDir: string | null = null
+  const { t, cleanup } = makeRepoTestContext()
   let repositoryPath: string
   if (opts.nonGit) {
     repositoryPath = '/tmp'
   } else {
-    testRepoDir = opts.staged ? createTempGitRepoWithStagedChanges() : createTempGitRepo()
-    repositoryPath = testRepoDir
+    const files = opts.staged ? { 'test-file.ts': 'const x = 1;\n' } : undefined
+    repositoryPath = createTestRepo(t, { prefix: 'git-test-', files })
   }
   initDatabase(dbPath)
   const config = createConfig({ repositoryPath, dbPath, authToken: TEST_TOKEN })
   const app = await buildApp(config, { logger: false })
-  return { app, testDbDir, testRepoDir }
+  return { app, testDbDir, cleanupRepo: cleanup }
 }
 
 async function teardownEnv (env: TestEnv): Promise<void> {
   await env.app.close()
   closeDatabase()
   if (env.testDbDir) fs.rmSync(env.testDbDir, { recursive: true, force: true })
-  if (env.testRepoDir) fs.rmSync(env.testRepoDir, { recursive: true, force: true })
+  env.cleanupRepo()
 }
 
 describe('review routes', () => {

@@ -2,11 +2,11 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
-import { initDatabase, closeDatabase } from '../../../src/server/db/index.ts'
+import { initDatabase, closeDatabase, getDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
 import type { FastifyInstance } from 'fastify'
-import { TEST_TOKEN, authHeader } from '../helpers.ts'
+import { TEST_TOKEN, authHeader, buildReviewInput, buildCommentInput } from '../helpers.ts'
 
 describe('comment routes', () => {
   let app: FastifyInstance
@@ -17,18 +17,12 @@ describe('comment routes', () => {
     initDatabase(':memory:')
     app = await buildApp(config, { logger: false, serveStatic: false })
 
-    // Create a test review
-    const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+    const db = getDatabase()
     const reviewRepo = new ReviewRepository(db)
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: process.cwd(),
-      baseRef: 'abc123',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData: JSON.stringify({ files: [], repository: { name: 'test', branch: 'main', remote: null, path: process.cwd() } }),
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 
@@ -53,18 +47,14 @@ describe('comment routes', () => {
 
     it('should return comments for a review', async () => {
       // Create a comment first
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Test comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'GET',
@@ -79,28 +69,22 @@ describe('comment routes', () => {
     })
 
     it('should filter comments by file path', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Comment on a.ts',
-        suggestion: null,
-        resolved: false,
-      })
-      commentRepo.create({
+      }))
+      commentRepo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 20,
-        lineType: 'added',
         content: 'Comment on b.ts',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'GET',
@@ -208,38 +192,31 @@ describe('comment routes', () => {
 
   describe('GET /api/reviews/:reviewId/comments/stats', () => {
     it('should return comment statistics', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Unresolved comment',
-        suggestion: null,
-        resolved: false,
-      })
-      commentRepo.create({
+      }))
+      commentRepo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 20,
-        lineType: 'added',
         content: 'Resolved comment',
-        suggestion: null,
         resolved: true,
-      })
-      commentRepo.create({
+      }))
+      commentRepo.create(buildCommentInput({
         id: 'comment-3',
         reviewId: testReviewId,
         filePath: 'src/c.ts',
         lineNumber: 30,
-        lineType: 'added',
         content: 'Comment with suggestion',
         suggestion: 'code',
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'GET',
@@ -258,18 +235,14 @@ describe('comment routes', () => {
 
   describe('GET /api/comments/:id', () => {
     it('should return a comment by ID', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Get me by ID',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'GET',
@@ -296,18 +269,14 @@ describe('comment routes', () => {
 
   describe('PATCH /api/comments/:id', () => {
     it('should update comment content', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Original content',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'PATCH',
@@ -335,18 +304,14 @@ describe('comment routes', () => {
 
   describe('DELETE /api/comments/:id', () => {
     it('should delete a comment', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'To be deleted',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'DELETE',
@@ -372,18 +337,14 @@ describe('comment routes', () => {
 
   describe('POST /api/comments/:id/resolve', () => {
     it('should mark comment as resolved', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Unresolved',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const response = await app.inject({
         method: 'POST',
@@ -409,18 +370,15 @@ describe('comment routes', () => {
 
   describe('POST /api/comments/:id/unresolve', () => {
     it('should mark comment as unresolved', async () => {
-      const db = (await import('../../../src/server/db/index.ts')).getDatabase()
+      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
-      commentRepo.create({
+      commentRepo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Resolved',
-        suggestion: null,
         resolved: true,
-      })
+      }))
 
       const response = await app.inject({
         method: 'POST',

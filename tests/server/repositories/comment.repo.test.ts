@@ -1,9 +1,10 @@
-import { describe, it, beforeEach, after } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
-import { migrate, migrations } from '../../../src/server/db/migrations.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
+import { buildReviewInput, buildCommentInput } from '../helpers.ts'
 
 describe('CommentRepository', () => {
   let db: DatabaseSync
@@ -12,41 +13,29 @@ describe('CommentRepository', () => {
   let testReviewId: string
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    migrate(db, migrations)
+    db = createTestDatabase()
     repo = new CommentRepository(db)
     reviewRepo = new ReviewRepository(db)
 
-    // Create a test review to attach comments to
-    const review = reviewRepo.create({
-      id: 'test-review-1',
+    const review = reviewRepo.create(buildReviewInput({
       repositoryPath: '/test/path',
-      baseRef: 'abc123',
-      sourceType: 'staged',
-      sourceRef: null,
       snapshotData: '{}',
-      status: 'in_progress',
-    })
+    }))
     testReviewId = review.id
   })
 
-  after(() => {
+  afterEach(() => {
     db?.close()
   })
 
   describe('create', () => {
     it('should create a comment and return it', () => {
-      const comment = repo.create({
+      const comment = repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Great change!',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       assert.strictEqual(comment.id, 'comment-1')
       assert.strictEqual(comment.reviewId, testReviewId)
@@ -61,32 +50,27 @@ describe('CommentRepository', () => {
     })
 
     it('should create a file-level comment with null line number', () => {
-      const comment = repo.create({
+      const comment = repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: null,
         lineType: null,
         content: 'File-level comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       assert.strictEqual(comment.lineNumber, null)
       assert.strictEqual(comment.lineType, null)
     })
 
     it('should create a comment with a suggestion', () => {
-      const comment = repo.create({
+      const comment = repo.create(buildCommentInput({
         id: 'comment-3',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 5,
         lineType: 'context',
         content: 'Consider this change',
         suggestion: 'const x = 1;',
-        resolved: false,
-      })
+      }))
 
       assert.strictEqual(comment.suggestion, 'const x = 1;')
     })
@@ -94,16 +78,12 @@ describe('CommentRepository', () => {
 
   describe('findById', () => {
     it('should return a comment by id', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Test comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const found = repo.findById('comment-1')
       assert.ok(found)
@@ -118,26 +98,20 @@ describe('CommentRepository', () => {
 
   describe('findByReview', () => {
     it('should return all comments for a review', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        lineNumber: 1,
-        lineType: 'added',
         content: 'Comment 1',
-        suggestion: null,
-        resolved: false,
-      })
-      repo.create({
+      }))
+      repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 2,
         lineType: 'removed',
         content: 'Comment 2',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const comments = repo.findByReview(testReviewId)
       assert.strictEqual(comments.length, 2)
@@ -151,26 +125,20 @@ describe('CommentRepository', () => {
 
   describe('findByFile', () => {
     it('should return comments for a specific file', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        lineNumber: 1,
-        lineType: 'added',
         content: 'Comment 1',
-        suggestion: null,
-        resolved: false,
-      })
-      repo.create({
+      }))
+      repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 2,
         lineType: 'removed',
         content: 'Comment 2',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const comments = repo.findByFile(testReviewId, 'src/a.ts')
       assert.strictEqual(comments.length, 1)
@@ -180,16 +148,12 @@ describe('CommentRepository', () => {
 
   describe('update', () => {
     it('should update comment content', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Original content',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const updated = repo.update('comment-1', { content: 'Updated content' })
       assert.ok(updated)
@@ -197,16 +161,12 @@ describe('CommentRepository', () => {
     })
 
     it('should update suggestion', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const updated = repo.update('comment-1', { suggestion: 'new code' })
       assert.ok(updated)
@@ -221,16 +181,12 @@ describe('CommentRepository', () => {
 
   describe('setResolved', () => {
     it('should mark comment as resolved', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const resolved = repo.setResolved('comment-1', true)
       assert.ok(resolved)
@@ -238,16 +194,13 @@ describe('CommentRepository', () => {
     })
 
     it('should mark comment as unresolved', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Comment',
-        suggestion: null,
         resolved: true,
-      })
+      }))
 
       const unresolved = repo.setResolved('comment-1', false)
       assert.ok(unresolved)
@@ -257,16 +210,12 @@ describe('CommentRepository', () => {
 
   describe('delete', () => {
     it('should delete a comment', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
-        filePath: 'src/index.ts',
         lineNumber: 10,
-        lineType: 'added',
         content: 'Comment',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const deleted = repo.delete('comment-1')
       assert.strictEqual(deleted, true)
@@ -281,26 +230,20 @@ describe('CommentRepository', () => {
 
   describe('deleteByReview', () => {
     it('should delete all comments for a review', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        lineNumber: 1,
-        lineType: 'added',
         content: 'Comment 1',
-        suggestion: null,
-        resolved: false,
-      })
-      repo.create({
+      }))
+      repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 2,
         lineType: 'removed',
         content: 'Comment 2',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const count = repo.deleteByReview(testReviewId)
       assert.strictEqual(count, 2)
@@ -310,26 +253,20 @@ describe('CommentRepository', () => {
 
   describe('countByReview', () => {
     it('should count comments for a review', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        lineNumber: 1,
-        lineType: 'added',
         content: 'Comment 1',
-        suggestion: null,
-        resolved: false,
-      })
-      repo.create({
+      }))
+      repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 2,
         lineType: 'removed',
         content: 'Comment 2',
-        suggestion: null,
-        resolved: false,
-      })
+      }))
 
       const count = repo.countByReview(testReviewId)
       assert.strictEqual(count, 2)
@@ -338,26 +275,21 @@ describe('CommentRepository', () => {
 
   describe('countUnresolvedByReview', () => {
     it('should count only unresolved comments', () => {
-      repo.create({
+      repo.create(buildCommentInput({
         id: 'comment-1',
         reviewId: testReviewId,
         filePath: 'src/a.ts',
-        lineNumber: 1,
-        lineType: 'added',
         content: 'Comment 1',
-        suggestion: null,
-        resolved: false,
-      })
-      repo.create({
+      }))
+      repo.create(buildCommentInput({
         id: 'comment-2',
         reviewId: testReviewId,
         filePath: 'src/b.ts',
         lineNumber: 2,
         lineType: 'removed',
         content: 'Comment 2',
-        suggestion: null,
         resolved: true,
-      })
+      }))
 
       const count = repo.countUnresolvedByReview(testReviewId)
       assert.strictEqual(count, 1)
