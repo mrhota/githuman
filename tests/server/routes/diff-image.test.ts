@@ -49,7 +49,7 @@ describe('GET /api/diff/image/*', () => {
     execSync('git commit -m "add images"', { cwd: repoDir, stdio: 'ignore' })
 
     const config = createConfig({ repositoryPath: repoDir, authToken: TEST_TOKEN })
-    app = await buildApp(config, { logger: false })
+    app = await buildApp(config, { logger: false, serveStatic: false })
   })
 
   afterEach(async () => {
