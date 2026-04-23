@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader } from '../helpers.ts'
 
@@ -29,7 +30,7 @@ describe('git routes', () => {
       repositoryPath: tempDir,
       authToken: TEST_TOKEN,
     })
-    app = await buildApp(config, { logger: false })
+    app = await buildApp(config, { logger: false, db: createTestDatabase() })
   })
 
   after(async () => {
@@ -365,7 +366,7 @@ describe('git staging routes', () => {
       repositoryPath: tempDir,
       authToken: TEST_TOKEN,
     })
-    app = await buildApp(config, { logger: false })
+    app = await buildApp(config, { logger: false, db: createTestDatabase() })
   })
 
   after(async () => {
@@ -524,7 +525,7 @@ describe('GET /api/diff/unstaged', () => {
       repositoryPath: tempDir,
       authToken: TEST_TOKEN,
     })
-    app = await buildApp(config, { logger: false })
+    app = await buildApp(config, { logger: false, db: createTestDatabase() })
   })
 
   after(async () => {

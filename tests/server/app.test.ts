@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert'
 import { buildApp } from '../../src/server/app.ts'
 import { createConfig } from '../../src/server/config.ts'
+import { createTestDatabase } from '../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN } from './helpers.ts'
 
@@ -13,7 +14,7 @@ describe('app', () => {
 
       before(async () => {
         const config = createConfig()
-        app = await buildApp(config, { logger: false })
+        app = await buildApp(config, { logger: false, db: createTestDatabase() })
       })
 
       after(async () => {
@@ -49,7 +50,7 @@ describe('app', () => {
         const config = createConfig({
           authToken: TEST_TOKEN,
         })
-        app = await buildApp(config, { logger: false })
+        app = await buildApp(config, { logger: false, db: createTestDatabase() })
       })
 
       after(async () => {
@@ -75,7 +76,7 @@ describe('app', () => {
         port: 4000,
         host: '0.0.0.0',
       })
-      const app = await buildApp(config, { logger: false })
+      const app = await buildApp(config, { logger: false, db: createTestDatabase() })
 
       assert.strictEqual(app.config.port, 4000)
       assert.strictEqual(app.config.host, '0.0.0.0')
@@ -89,7 +90,7 @@ describe('app', () => {
 
     before(async () => {
       const config = createConfig()
-      app = await buildApp(config, { logger: false })
+      app = await buildApp(config, { logger: false, db: createTestDatabase() })
     })
 
     after(async () => {

@@ -2,7 +2,7 @@
  * Status command - show overview of reviews and todos
  */
 import { parseArgs } from 'node:util'
-import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
+import { initDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import { TodoRepository } from '../../server/repositories/todo.repo.ts'
@@ -51,8 +51,7 @@ export async function statusCommand (args: string[], ctx: CliContext = systemCli
   const config = createConfig({ cwd: ctx.cwd() })
 
   try {
-    initDatabase(config.dbPath)
-    const db = getDatabase()
+    const db = initDatabase(config.dbPath)
     const reviewRepo = new ReviewRepository(db)
     const todoRepo = new TodoRepository(db)
 
@@ -107,7 +106,7 @@ export async function statusCommand (args: string[], ctx: CliContext = systemCli
       }
     }
 
-    closeDatabase()
+    db.close()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       if (values.json) {

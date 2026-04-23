@@ -2,7 +2,7 @@
  * Resolve command - mark a review as approved and resolve all comments
  */
 import { parseArgs } from 'node:util'
-import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
+import { initDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import { ReviewFileRepository } from '../../server/repositories/review-file.repo.ts'
@@ -61,8 +61,7 @@ export async function resolveCommand (args: string[], ctx: CliContext = systemCl
   const config = createConfig({ cwd: ctx.cwd() })
 
   try {
-    initDatabase(config.dbPath)
-    const db = getDatabase()
+    const db = initDatabase(config.dbPath)
     const reviewRepo = new ReviewRepository(db)
     const fileRepo = new ReviewFileRepository(db)
     const commentRepo = new CommentRepository(db)
@@ -133,7 +132,7 @@ export async function resolveCommand (args: string[], ctx: CliContext = systemCl
       }
     }
 
-    closeDatabase()
+    db.close()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       ctx.stderr('Error: Database does not exist. No reviews have been created yet.')

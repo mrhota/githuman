@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
-import { initDatabase, closeDatabase } from '../../../src/server/db/index.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader } from '../helpers.ts'
 import type { ChangeDetector } from '../../../src/server/ports.ts'
@@ -23,14 +23,13 @@ describe('events routes', () => {
   let app: FastifyInstance
 
   beforeEach(async () => {
+    const db = createTestDatabase()
     const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
-    initDatabase(config.dbPath)
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db })
   })
 
   afterEach(async () => {
     await app.close()
-    closeDatabase()
   })
 
   describe('GET /api/events/clients', () => {
@@ -171,8 +170,9 @@ describe('events routes', () => {
     // Guards against a past SIGINT regression where SSE/change-detector handles
     // kept the event loop alive, causing `githuman serve` to hang on Ctrl-C.
     it('should close cleanly without hanging', async () => {
+      const testDb = createTestDatabase()
       const config = createConfig({ dbPath: ':memory:', authToken: TEST_TOKEN })
-      const testApp = await buildApp(config, { logger: false, serveStatic: false })
+      const testApp = await buildApp(config, { logger: false, serveStatic: false, db: testDb })
 
       const startTime = Date.now()
       await testApp.close()

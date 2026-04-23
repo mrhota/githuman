@@ -25,6 +25,7 @@ import { createGitAdapter } from './adapters/git.ts'
 import { createChangeDetector } from './adapters/change-detector.ts'
 import type { EventBus, ChangeDetector } from './ports.ts'
 import type { ServerConfig } from './config.ts'
+import type { DatabaseSync } from 'node:sqlite'
 import type { HealthResponse } from '../shared/types.ts'
 import { HealthResponseSchema } from './schemas/common.ts'
 
@@ -34,6 +35,7 @@ export interface AppOptions {
   logger?: boolean;
   serveStatic?: boolean;
   verbose?: boolean;
+  db: DatabaseSync;
 }
 
 function getLoggerConfig (enabled: boolean, verbose: boolean) {
@@ -57,7 +59,7 @@ function getLoggerConfig (enabled: boolean, verbose: boolean) {
 
 export async function buildApp (
   config: ServerConfig,
-  options: AppOptions = {}
+  options: AppOptions
 ): Promise<FastifyInstance> {
   // Configure HTTPS if enabled with valid certificates
   const httpsOptions = config.https && config.tlsCert && config.tlsKey
@@ -189,7 +191,7 @@ export async function buildApp (
   app.decorate('config', config)
 
   // Register service factories
-  await app.register(servicesPlugin)
+  await app.register(servicesPlugin, { db: options.db })
 
   // Create and decorate the EventBus
   const eventBus = createEventBus()

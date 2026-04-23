@@ -29,9 +29,9 @@ export function createTestRepo (t: TestContext): string {
 export async function createTestRepoWithDb (t: TestContext): Promise<string> {
   const tempDir = createTestRepo(t)
 
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
-  initDatabase(join(tempDir, '.githuman', 'reviews.db'))
-  closeDatabase()
+  const { initDatabase } = await import('../../src/server/db/index.ts')
+  const db = initDatabase(join(tempDir, '.githuman', 'reviews.db'))
+  db.close()
 
   return tempDir
 }

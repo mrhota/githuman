@@ -10,7 +10,7 @@ async function seedReview (dbPath: string, overrides: {
   status?: string
   createdAt?: string
 } = {}) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   const id = overrides.id ?? REVIEW_ID
@@ -21,14 +21,14 @@ async function seedReview (dbPath: string, overrides: {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, '/tmp/test', 'abc123', 'staged', null, '{}', overrides.status ?? 'in_progress', now, now)
 
-  closeDatabase()
+  db.close()
 }
 
 async function seedTodo (dbPath: string, overrides: {
   content?: string
   completed?: boolean
 } = {}) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   const id = crypto.randomUUID()
@@ -39,7 +39,7 @@ async function seedTodo (dbPath: string, overrides: {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(id, overrides.content ?? 'test todo', overrides.completed ? 1 : 0, null, 0, now, now)
 
-  closeDatabase()
+  db.close()
 }
 
 describe('CLI status command', () => {

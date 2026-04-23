@@ -37,7 +37,7 @@ async function seedReview (dbPath: string, overrides: {
   sourceRef?: string | null
   createdAt?: string
 } = {}) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   const id = overrides.id ?? REVIEW_ID
@@ -58,7 +58,7 @@ async function seedReview (dbPath: string, overrides: {
     now
   )
 
-  closeDatabase()
+  db.close()
 }
 
 async function seedReviewFile (dbPath: string, reviewId: string, file: {
@@ -68,7 +68,7 @@ async function seedReviewFile (dbPath: string, reviewId: string, file: {
   deletions?: number
   hunksData?: string | null
 }) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   db.prepare(`
@@ -86,7 +86,7 @@ async function seedReviewFile (dbPath: string, reviewId: string, file: {
     '2025-06-15T10:00:00.000Z'
   )
 
-  closeDatabase()
+  db.close()
 }
 
 async function seedComment (dbPath: string, comment: {
@@ -98,7 +98,7 @@ async function seedComment (dbPath: string, comment: {
   suggestion?: string | null
   resolved?: boolean
 }) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   db.prepare(`
@@ -117,7 +117,7 @@ async function seedComment (dbPath: string, comment: {
     '2025-06-15T10:00:00.000Z'
   )
 
-  closeDatabase()
+  db.close()
 }
 
 describe('CLI export command', () => {

@@ -148,7 +148,7 @@ Uses Node.js native SQLite (`node:sqlite` - requires Node 24+):
 - Synchronous API via `DatabaseSync`
 - Migrations in `src/server/db/migrations.ts`
 - In-memory databases for testing via `createTestDatabase()`
-- Global singleton accessed via `getDatabase()` after `initDatabase()`
+- `initDatabase(path)` is a pure factory — no global state. Callers pass the returned `DatabaseSync` instance explicitly via `AppOptions.db`.
 
 ### Shared Types
 
