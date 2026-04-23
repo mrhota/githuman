@@ -3,7 +3,7 @@
  */
 import { parseArgs } from 'node:util'
 import { writeFileSync } from 'node:fs'
-import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
+import { initDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ExportService } from '../../server/services/export.service.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
@@ -56,8 +56,7 @@ export async function exportCommand (args: string[], ctx: CliContext = systemCli
   const config = createConfig({ cwd: ctx.cwd() })
 
   try {
-    initDatabase(config.dbPath)
-    const db = getDatabase()
+    const db = initDatabase(config.dbPath)
 
     // Handle "last" keyword
     if (reviewId === 'last') {
@@ -93,7 +92,7 @@ export async function exportCommand (args: string[], ctx: CliContext = systemCli
       ctx.stdout(markdown)
     }
 
-    closeDatabase()
+    db.close()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       ctx.stderr('Error: Database does not exist. No reviews have been created yet.')

@@ -2,7 +2,7 @@
  * List command - list all saved reviews
  */
 import { parseArgs } from 'node:util'
-import { initDatabase, closeDatabase } from '../../server/db/index.ts'
+import { initDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { ReviewRepository } from '../../server/repositories/review.repo.ts'
 import type { ReviewStatus } from '../../shared/types.ts'
@@ -88,7 +88,7 @@ export async function listCommand (args: string[], ctx: CliContext = systemCliCo
       }
     }
 
-    closeDatabase()
+    db.close()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       ctx.stdout('No reviews found. Database does not exist yet.')

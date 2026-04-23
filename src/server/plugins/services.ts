@@ -2,8 +2,8 @@
  * Service factory plugin — centralizes service construction
  */
 import type { FastifyPluginAsync } from 'fastify'
+import type { DatabaseSync } from 'node:sqlite'
 import fp from 'fastify-plugin'
-import { getDatabase } from '../db/index.ts'
 import { ReviewService } from '../services/review.service.ts'
 import { CommentService } from '../services/comment.service.ts'
 import { ExportService } from '../services/export.service.ts'
@@ -22,10 +22,18 @@ export interface ServiceFactories {
   todoRepo: () => TodoRepository
 }
 
-const servicesPlugin: FastifyPluginAsync = async (fastify) => {
+export interface ServicesPluginOptions {
+  db: DatabaseSync
+}
+
+const servicesPlugin: FastifyPluginAsync<ServicesPluginOptions> = async (fastify, opts) => {
+  if (!opts.db) {
+    throw new Error('services plugin requires a db instance via options')
+  }
+  const db = opts.db
+
   const services: ServiceFactories = {
     review: (log?) => {
-      const db = getDatabase()
       return new ReviewService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
@@ -33,14 +41,12 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
       )
     },
     comment: () => {
-      const db = getDatabase()
       return new CommentService(
         new CommentRepository(db),
         new ReviewRepository(db)
       )
     },
     export: () => {
-      const db = getDatabase()
       return new ExportService(
         new ReviewRepository(db),
         new ReviewFileRepository(db),
@@ -48,7 +54,7 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
       )
     },
     git: (log?) => new GitService(createGitAdapter(fastify.config.repositoryPath), fastify.config.repositoryPath, log),
-    todoRepo: () => new TodoRepository(getDatabase()),
+    todoRepo: () => new TodoRepository(db),
   }
 
   fastify.decorate('services', services)

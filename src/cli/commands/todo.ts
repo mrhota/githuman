@@ -3,7 +3,7 @@
  */
 import { parseArgs } from 'node:util'
 import { randomUUID } from 'node:crypto'
-import { initDatabase, closeDatabase, getDatabase } from '../../server/db/index.ts'
+import { initDatabase } from '../../server/db/index.ts'
 import { createConfig } from '../../server/config.ts'
 import { TodoRepository } from '../../server/repositories/todo.repo.ts'
 import { type CliContext, systemCliContext } from '../context.ts'
@@ -88,8 +88,7 @@ export async function todoCommand (args: string[], ctx: CliContext = systemCliCo
   let didMutate = false
 
   try {
-    initDatabase(config.dbPath)
-    const db = getDatabase()
+    const db = initDatabase(config.dbPath)
     const repo = new TodoRepository(db)
 
     switch (subcommand) {
@@ -294,7 +293,7 @@ export async function todoCommand (args: string[], ctx: CliContext = systemCliCo
       await notifyServer(config)
     }
 
-    closeDatabase()
+    db.close()
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       if (subcommand === 'list') {

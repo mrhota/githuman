@@ -6,7 +6,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { buildApp } from '../../src/server/app.ts'
 import { createConfig } from '../../src/server/config.ts'
-import { initDatabase, closeDatabase } from '../../src/server/db/index.ts'
+import { createTestDatabase } from '../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader } from './helpers.ts'
 
@@ -14,14 +14,13 @@ describe('security tests', () => {
   let app: FastifyInstance
 
   beforeEach(async () => {
+    const db = createTestDatabase()
     const config = createConfig({ repositoryPath: process.cwd(), authToken: TEST_TOKEN })
-    initDatabase(':memory:')
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db })
   })
 
   afterEach(async () => {
     await app?.close()
-    closeDatabase()
   })
 
   describe('SQL injection prevention', () => {
@@ -199,14 +198,13 @@ describe('schema validation tests', () => {
   let app: FastifyInstance
 
   beforeEach(async () => {
+    const db = createTestDatabase()
     const config = createConfig({ repositoryPath: process.cwd(), authToken: TEST_TOKEN })
-    initDatabase(':memory:')
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db })
   })
 
   afterEach(async () => {
     await app?.close()
-    closeDatabase()
   })
 
   describe('response schemas match actual data', () => {

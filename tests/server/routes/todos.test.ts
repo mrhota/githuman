@@ -1,8 +1,9 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
+import type { DatabaseSync } from 'node:sqlite'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
-import { initDatabase, closeDatabase, getDatabase } from '../../../src/server/db/index.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { TodoRepository } from '../../../src/server/repositories/todo.repo.ts'
 import type { FastifyInstance } from 'fastify'
@@ -10,15 +11,15 @@ import { TEST_TOKEN, authHeader, buildReviewInput } from '../helpers.ts'
 
 describe('todo routes', () => {
   let app: FastifyInstance
+  let db: DatabaseSync
   let testReviewId: string
 
   beforeEach(async () => {
+    db = createTestDatabase()
     const config = createConfig({ repositoryPath: process.cwd(), authToken: TEST_TOKEN })
-    initDatabase(':memory:')
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db })
 
     // Create a test review for linking todos
-    const db = getDatabase()
     const reviewRepo = new ReviewRepository(db)
     const review = reviewRepo.create(buildReviewInput({
       repositoryPath: process.cwd(),
@@ -29,7 +30,6 @@ describe('todo routes', () => {
 
   afterEach(async () => {
     await app?.close()
-    closeDatabase()
   })
 
   describe('GET /api/todos', () => {
@@ -48,7 +48,6 @@ describe('todo routes', () => {
     })
 
     it('should return all todos', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Todo 1', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Todo 2', completed: true, reviewId: null })
@@ -66,7 +65,6 @@ describe('todo routes', () => {
     })
 
     it('should filter by completed status', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Pending', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Done', completed: true, reviewId: null })
@@ -85,7 +83,6 @@ describe('todo routes', () => {
     })
 
     it('should filter by review id', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Review todo', completed: false, reviewId: testReviewId })
       todoRepo.create({ id: 'todo-2', content: 'Global todo', completed: false, reviewId: null })
@@ -104,7 +101,6 @@ describe('todo routes', () => {
     })
 
     it('should paginate results', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       for (let i = 1; i <= 25; i++) {
         todoRepo.create({ id: `todo-${i}`, content: `Todo ${i}`, completed: false, reviewId: null })
@@ -147,7 +143,6 @@ describe('todo routes', () => {
 
   describe('GET /api/todos/stats', () => {
     it('should return todo statistics', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Pending 1', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Pending 2', completed: false, reviewId: null })
@@ -200,7 +195,6 @@ describe('todo routes', () => {
 
   describe('GET /api/todos/:id', () => {
     it('should return a specific todo', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Test todo', completed: false, reviewId: null })
 
@@ -229,7 +223,6 @@ describe('todo routes', () => {
 
   describe('PATCH /api/todos/:id', () => {
     it('should update todo content', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Original', completed: false, reviewId: null })
 
@@ -246,7 +239,6 @@ describe('todo routes', () => {
     })
 
     it('should update todo completed status', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Test', completed: false, reviewId: null })
 
@@ -276,7 +268,6 @@ describe('todo routes', () => {
 
   describe('DELETE /api/todos/:id', () => {
     it('should delete a todo', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'To delete', completed: false, reviewId: null })
 
@@ -307,7 +298,6 @@ describe('todo routes', () => {
 
   describe('POST /api/todos/:id/toggle', () => {
     it('should toggle pending to completed', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Test', completed: false, reviewId: null })
 
@@ -323,7 +313,6 @@ describe('todo routes', () => {
     })
 
     it('should toggle completed to pending', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Test', completed: true, reviewId: null })
 
@@ -351,7 +340,6 @@ describe('todo routes', () => {
 
   describe('DELETE /api/todos/completed', () => {
     it('should delete all completed todos', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'Pending', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Done 1', completed: true, reviewId: null })
@@ -374,7 +362,6 @@ describe('todo routes', () => {
 
   describe('POST /api/todos/reorder', () => {
     it('should reorder todos by IDs', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'First', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Second', completed: false, reviewId: null })
@@ -401,7 +388,6 @@ describe('todo routes', () => {
 
   describe('POST /api/todos/:id/move', () => {
     it('should move a todo to a new position', async () => {
-      const db = getDatabase()
       const todoRepo = new TodoRepository(db)
       todoRepo.create({ id: 'todo-1', content: 'First', completed: false, reviewId: null })
       todoRepo.create({ id: 'todo-2', content: 'Second', completed: false, reviewId: null })

@@ -1,8 +1,9 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
+import type { DatabaseSync } from 'node:sqlite'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
-import { initDatabase, closeDatabase, getDatabase } from '../../../src/server/db/index.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
 import { ReviewRepository } from '../../../src/server/repositories/review.repo.ts'
 import { CommentRepository } from '../../../src/server/repositories/comment.repo.ts'
 import type { FastifyInstance } from 'fastify'
@@ -10,14 +11,14 @@ import { TEST_TOKEN, authHeader, buildReviewInput, buildCommentInput } from '../
 
 describe('comment routes', () => {
   let app: FastifyInstance
+  let db: DatabaseSync
   let testReviewId: string
 
   beforeEach(async () => {
+    db = createTestDatabase()
     const config = createConfig({ repositoryPath: process.cwd(), authToken: TEST_TOKEN })
-    initDatabase(':memory:')
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db })
 
-    const db = getDatabase()
     const reviewRepo = new ReviewRepository(db)
     const review = reviewRepo.create(buildReviewInput({
       repositoryPath: process.cwd(),
@@ -28,7 +29,6 @@ describe('comment routes', () => {
 
   afterEach(async () => {
     await app?.close()
-    closeDatabase()
   })
 
   describe('GET /api/reviews/:reviewId/comments', () => {
@@ -47,7 +47,6 @@ describe('comment routes', () => {
 
     it('should return comments for a review', async () => {
       // Create a comment first
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -69,7 +68,6 @@ describe('comment routes', () => {
     })
 
     it('should filter comments by file path', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -192,7 +190,6 @@ describe('comment routes', () => {
 
   describe('GET /api/reviews/:reviewId/comments/stats', () => {
     it('should return comment statistics', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -235,7 +232,6 @@ describe('comment routes', () => {
 
   describe('GET /api/comments/:id', () => {
     it('should return a comment by ID', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -269,7 +265,6 @@ describe('comment routes', () => {
 
   describe('PATCH /api/comments/:id', () => {
     it('should update comment content', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -304,7 +299,6 @@ describe('comment routes', () => {
 
   describe('DELETE /api/comments/:id', () => {
     it('should delete a comment', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -337,7 +331,6 @@ describe('comment routes', () => {
 
   describe('POST /api/comments/:id/resolve', () => {
     it('should mark comment as resolved', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',
@@ -370,7 +363,6 @@ describe('comment routes', () => {
 
   describe('POST /api/comments/:id/unresolve', () => {
     it('should mark comment as unresolved', async () => {
-      const db = getDatabase()
       const commentRepo = new CommentRepository(db)
       commentRepo.create(buildCommentInput({
         id: 'comment-1',

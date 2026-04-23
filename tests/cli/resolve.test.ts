@@ -16,7 +16,7 @@ async function insertReview (dbPath: string, review: {
   sourceType?: string;
   sourceRef?: string | null;
 }) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   const now = new Date().toISOString()
@@ -40,7 +40,7 @@ async function insertReview (dbPath: string, review: {
     now
   )
 
-  closeDatabase()
+  db.close()
 }
 
 /**
@@ -51,7 +51,7 @@ async function insertComment (dbPath: string, comment: {
   reviewId: string;
   resolved?: boolean;
 }) {
-  const { initDatabase, closeDatabase } = await import('../../src/server/db/index.ts')
+  const { initDatabase } = await import('../../src/server/db/index.ts')
   const db = initDatabase(dbPath)
 
   const now = new Date().toISOString()
@@ -71,7 +71,7 @@ async function insertComment (dbPath: string, comment: {
     now
   )
 
-  closeDatabase()
+  db.close()
 }
 
 describe('CLI resolve command - state machine enforcement', () => {

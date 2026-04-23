@@ -6,7 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
-import { initDatabase, closeDatabase } from '../../../src/server/db/index.ts'
+import { initDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader, createTestRepo, type TestContext } from '../helpers.ts'
 
@@ -37,15 +37,14 @@ async function buildEnv (opts: { staged?: boolean, nonGit?: boolean, dbPrefix: s
     const files = opts.staged ? { 'test-file.ts': 'const x = 1;\n' } : undefined
     repositoryPath = createTestRepo(t, { prefix: 'git-test-', files })
   }
-  initDatabase(dbPath)
+  const db = initDatabase(dbPath)
   const config = createConfig({ repositoryPath, dbPath, authToken: TEST_TOKEN })
-  const app = await buildApp(config, { logger: false })
+  const app = await buildApp(config, { logger: false, db })
   return { app, testDbDir, cleanupRepo: cleanup }
 }
 
 async function teardownEnv (env: TestEnv): Promise<void> {
   await env.app.close()
-  closeDatabase()
   if (env.testDbDir) fs.rmSync(env.testDbDir, { recursive: true, force: true })
   env.cleanupRepo()
 }

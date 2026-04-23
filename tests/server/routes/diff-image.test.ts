@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { buildApp } from '../../../src/server/app.ts'
 import { createConfig } from '../../../src/server/config.ts'
+import { createTestDatabase } from '../../../src/server/db/index.ts'
 import type { FastifyInstance } from 'fastify'
 import { TEST_TOKEN, authHeader, createTestRepo, type TestContext } from '../helpers.ts'
 
@@ -49,7 +50,7 @@ describe('GET /api/diff/image/*', () => {
     execSync('git commit -m "add images"', { cwd: repoDir, stdio: 'ignore' })
 
     const config = createConfig({ repositoryPath: repoDir, authToken: TEST_TOKEN })
-    app = await buildApp(config, { logger: false, serveStatic: false })
+    app = await buildApp(config, { logger: false, serveStatic: false, db: createTestDatabase() })
   })
 
   afterEach(async () => {
